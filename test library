@@ -1,0 +1,224 @@
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/cabscer/neyrone-open-sourced/refs/heads/main/Library"))()
+local EspInterface = loadstring(game:HttpGet("https://raw.githubusercontent.com/cabscer/neyrone-open-sourced/refs/heads/main/esp%20library"))()
+
+local Window = Library:Window({
+    Name = "ESP Menu",
+    Size = UDim2.new(0, 550, 0, 400)
+})
+
+local Page = Window:Page({
+    Name = "Visuals",
+    Columns = 2
+})
+
+local EnemySection = Page:Section({
+    Name = "Enemy ESP",
+    Side = 1
+})
+
+EnemySection:Toggle({
+    Name = "Master Switch",
+    Default = false,
+    Flag = "EnemyEnabled",
+    Callback = function(Value)
+        EspInterface.teamSettings.enemy.enabled = Value
+    end
+})
+
+EnemySection:Toggle({
+    Name = "Boxes",
+    Default = false,
+    Flag = "EnemyBox",
+    Callback = function(Value)
+        EspInterface.teamSettings.enemy.box = Value
+    end
+})
+
+EnemySection:Toggle({
+    Name = "Box Fill",
+    Default = false,
+    Flag = "EnemyBoxFill",
+    Callback = function(Value)
+        EspInterface.teamSettings.enemy.boxFill = Value
+    end
+})
+
+EnemySection:Toggle({
+    Name = "Health Bar",
+    Default = false,
+    Flag = "EnemyHealthBar",
+    Callback = function(Value)
+        EspInterface.teamSettings.enemy.healthBar = Value
+    end
+})
+
+EnemySection:Toggle({
+    Name = "Health Text",
+    Default = false,
+    Flag = "EnemyHealthText",
+    Callback = function(Value)
+        EspInterface.teamSettings.enemy.healthText = Value
+    end
+})
+
+EnemySection:Toggle({
+    Name = "Name",
+    Default = false,
+    Flag = "EnemyName",
+    Callback = function(Value)
+        EspInterface.teamSettings.enemy.name = Value
+    end
+})
+
+EnemySection:Toggle({
+    Name = "Distance",
+    Default = false,
+    Flag = "EnemyDistance",
+    Callback = function(Value)
+        EspInterface.teamSettings.enemy.distance = Value
+    end
+})
+
+EnemySection:Toggle({
+    Name = "Weapon",
+    Default = false,
+    Flag = "EnemyWeapon",
+    Callback = function(Value)
+        EspInterface.teamSettings.enemy.weapon = Value
+    end
+})
+
+EnemySection:Toggle({
+    Name = "Tracer",
+    Default = false,
+    Flag = "EnemyTracer",
+    Callback = function(Value)
+        EspInterface.teamSettings.enemy.tracer = Value
+    end
+})
+
+EnemySection:Toggle({
+    Name = "Chams",
+    Default = false,
+    Flag = "EnemyChams",
+    Callback = function(Value)
+        EspInterface.teamSettings.enemy.chams = Value
+    end
+})
+
+local FriendlySection = Page:Section({
+    Name = "Friendly ESP",
+    Side = 2
+})
+
+FriendlySection:Toggle({
+    Name = "Master Switch",
+    Default = false,
+    Flag = "FriendlyEnabled",
+    Callback = function(Value)
+        EspInterface.teamSettings.friendly.enabled = Value
+    end
+})
+
+FriendlySection:Toggle({
+    Name = "Boxes",
+    Default = false,
+    Flag = "FriendlyBox",
+    Callback = function(Value)
+        EspInterface.teamSettings.friendly.box = Value
+    end
+})
+
+FriendlySection:Toggle({
+    Name = "Health Bar",
+    Default = false,
+    Flag = "FriendlyHealthBar",
+    Callback = function(Value)
+        EspInterface.teamSettings.friendly.healthBar = Value
+    end
+})
+
+FriendlySection:Toggle({
+    Name = "Name",
+    Default = false,
+    Flag = "FriendlyName",
+    Callback = function(Value)
+        EspInterface.teamSettings.friendly.name = Value
+    end
+})
+
+FriendlySection:Toggle({
+    Name = "Tracer",
+    Default = false,
+    Flag = "FriendlyTracer",
+    Callback = function(Value)
+        EspInterface.teamSettings.friendly.tracer = Value
+    end
+})
+
+local SharedSection = Page:Section({
+    Name = "Shared Settings",
+    Side = 2
+})
+
+SharedSection:Toggle({
+    Name = "Limit Distance",
+    Default = false,
+    Flag = "LimitDistance",
+    Callback = function(Value)
+        EspInterface.sharedSettings.limitDistance = Value
+    end
+})
+
+SharedSection:Slider({
+    Name = "Max Distance",
+    Min = 50,
+    Max = 2000,
+    Default = 500,
+    Suffix = " studs",
+    Flag = "MaxDistance",
+    Callback = function(Value)
+        EspInterface.sharedSettings.maxDistance = Value
+    end
+})
+
+SharedSection:Toggle({
+    Name = "Show Priorities",
+    Default = false,
+    Flag = "ShowPriorities",
+    Callback = function(Value)
+        EspInterface.sharedSettings.showPriorities = Value
+    end
+})
+
+local ControlSection = Page:Section({
+    Name = "Controls",
+    Side = 2
+})
+
+ControlSection:Button({
+    Name = "Load ESP",
+    Callback = function()
+        if not EspInterface._hasLoaded then
+            EspInterface.Load()
+            Library:Notification("ESP Loaded", 3, Color3.fromRGB(0, 255, 100))
+        else
+            Library:Notification("ESP already loaded", 3, Color3.fromRGB(255, 170, 0))
+        end
+    end
+})
+
+ControlSection:Button({
+    Name = "Unload ESP",
+    Risky = true,
+    Callback = function()
+        if EspInterface._hasLoaded then
+            EspInterface.Unload()
+            Library:Notification("ESP Unloaded", 3, Color3.fromRGB(255, 50, 50))
+        else
+            Library:Notification("ESP not loaded", 3, Color3.fromRGB(255, 170, 0))
+        end
+    end
+})
+
+Library:Watermark("ESP Script | Loaded")
