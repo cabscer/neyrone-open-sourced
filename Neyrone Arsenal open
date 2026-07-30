@@ -1,224 +1,1571 @@
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/cabscer/neyrone-open-sourced/refs/heads/main/Library"))()
-local EspInterface = loadstring(game:HttpGet("https://raw.githubusercontent.com/cabscer/neyrone-open-sourced/refs/heads/main/esp%20library"))()
+local EspInterface = loadstring(game:HttpGet("https://raw.githubusercontent.com/cabscer/neyrone-open-sourced/refs/heads/main/Arsenal%20Esp"))()
 
-local Window = Library:Window({
-    Name = "ESP Menu",
-    Size = UDim2.new(0, 550, 0, 400)
-})
+local runService = game:GetService("RunService")
+local players = game:GetService("Players")
+local replicatedStorage = game:GetService("ReplicatedStorage")
+local userInputService = game:GetService("UserInputService")
+local lighting = game:GetService("Lighting")
+local teleportService = game:GetService("TeleportService")
+local workspace = game:GetService("Workspace")
+local tweenService = game:GetService("TweenService")
 
-local Page = Window:Page({
-    Name = "Visuals",
-    Columns = 2
-})
+local localPlayer = players.LocalPlayer
+local camera = workspace.CurrentCamera
+local mouse = localPlayer:GetMouse()
 
-local EnemySection = Page:Section({
-    Name = "Enemy ESP",
-    Side = 1
-})
+local Client = {
+    HasHookmetamethod = hookmetamethod ~= nil,
+    HasHookfunction = hookfunction ~= nil,
+    HasMousemoverel = mousemoverel ~= nil,
+    HasRequire = require ~= nil,
+    HasGetsenv = getsenv ~= nil,
+    HasGetnamecallmethod = getnamecallmethod ~= nil,
+    HasNewcclosure = newcclosure ~= nil,
+    HasCheckcaller = checkcaller ~= nil,
+    HasSethiddenproperty = sethiddenproperty ~= nil
+}
 
-EnemySection:Toggle({
-    Name = "Master Switch",
-    Default = false,
-    Flag = "EnemyEnabled",
-    Callback = function(Value)
-        EspInterface.teamSettings.enemy.enabled = Value
+local function isAlive(player)
+    if not player or not player.Character then return false end
+    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+    return humanoid and humanoid.Health > 0
+end
+
+local function isFriendly(player)
+    if player == localPlayer then return true end
+    if localPlayer.Neutral or player.Neutral then return false end
+    return player.Team == localPlayer.Team
+end
+
+local function getWeapon(player)
+    if player.Character then
+        local tool = player.Character:FindFirstChildOfClass("Tool")
+        if tool then return tool.Name end
     end
-})
+    return "Unknown"
+end
 
-EnemySection:Toggle({
-    Name = "Boxes",
-    Default = false,
-    Flag = "EnemyBox",
-    Callback = function(Value)
-        EspInterface.teamSettings.enemy.box = Value
+local function getHealth(player)
+    local char = player.Character
+    local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        return humanoid.Health, humanoid.MaxHealth
     end
-})
+    return 100, 100
+end
 
-EnemySection:Toggle({
-    Name = "Box Fill",
-    Default = false,
-    Flag = "EnemyBoxFill",
-    Callback = function(Value)
-        EspInterface.teamSettings.enemy.boxFill = Value
-    end
-})
+local function getCharacter(player)
+    return player.Character, isAlive(player)
+end
 
-EnemySection:Toggle({
-    Name = "Health Bar",
-    Default = false,
-    Flag = "EnemyHealthBar",
-    Callback = function(Value)
-        EspInterface.teamSettings.enemy.healthBar = Value
-    end
-})
+EspInterface.getWeapon = getWeapon
+EspInterface.isFriendly = isFriendly
+EspInterface.getCharacter = getCharacter
+EspInterface.getHealth = getHealth
 
-EnemySection:Toggle({
-    Name = "Health Text",
-    Default = false,
-    Flag = "EnemyHealthText",
-    Callback = function(Value)
-        EspInterface.teamSettings.enemy.healthText = Value
-    end
-})
-
-EnemySection:Toggle({
-    Name = "Name",
-    Default = false,
-    Flag = "EnemyName",
-    Callback = function(Value)
-        EspInterface.teamSettings.enemy.name = Value
-    end
-})
-
-EnemySection:Toggle({
-    Name = "Distance",
-    Default = false,
-    Flag = "EnemyDistance",
-    Callback = function(Value)
-        EspInterface.teamSettings.enemy.distance = Value
-    end
-})
-
-EnemySection:Toggle({
-    Name = "Weapon",
-    Default = false,
-    Flag = "EnemyWeapon",
-    Callback = function(Value)
-        EspInterface.teamSettings.enemy.weapon = Value
-    end
-})
-
-EnemySection:Toggle({
-    Name = "Tracer",
-    Default = false,
-    Flag = "EnemyTracer",
-    Callback = function(Value)
-        EspInterface.teamSettings.enemy.tracer = Value
-    end
-})
-
-EnemySection:Toggle({
-    Name = "Chams",
-    Default = false,
-    Flag = "EnemyChams",
-    Callback = function(Value)
-        EspInterface.teamSettings.enemy.chams = Value
-    end
-})
-
-local FriendlySection = Page:Section({
-    Name = "Friendly ESP",
-    Side = 2
-})
-
-FriendlySection:Toggle({
-    Name = "Master Switch",
-    Default = false,
-    Flag = "FriendlyEnabled",
-    Callback = function(Value)
-        EspInterface.teamSettings.friendly.enabled = Value
-    end
-})
-
-FriendlySection:Toggle({
-    Name = "Boxes",
-    Default = false,
-    Flag = "FriendlyBox",
-    Callback = function(Value)
-        EspInterface.teamSettings.friendly.box = Value
-    end
-})
-
-FriendlySection:Toggle({
-    Name = "Health Bar",
-    Default = false,
-    Flag = "FriendlyHealthBar",
-    Callback = function(Value)
-        EspInterface.teamSettings.friendly.healthBar = Value
-    end
-})
-
-FriendlySection:Toggle({
-    Name = "Name",
-    Default = false,
-    Flag = "FriendlyName",
-    Callback = function(Value)
-        EspInterface.teamSettings.friendly.name = Value
-    end
-})
-
-FriendlySection:Toggle({
-    Name = "Tracer",
-    Default = false,
-    Flag = "FriendlyTracer",
-    Callback = function(Value)
-        EspInterface.teamSettings.friendly.tracer = Value
-    end
-})
-
-local SharedSection = Page:Section({
-    Name = "Shared Settings",
-    Side = 2
-})
-
-SharedSection:Toggle({
-    Name = "Limit Distance",
-    Default = false,
-    Flag = "LimitDistance",
-    Callback = function(Value)
-        EspInterface.sharedSettings.limitDistance = Value
-    end
-})
-
-SharedSection:Slider({
-    Name = "Max Distance",
-    Min = 50,
-    Max = 2000,
-    Default = 500,
-    Suffix = " studs",
-    Flag = "MaxDistance",
-    Callback = function(Value)
-        EspInterface.sharedSettings.maxDistance = Value
-    end
-})
-
-SharedSection:Toggle({
-    Name = "Show Priorities",
-    Default = false,
-    Flag = "ShowPriorities",
-    Callback = function(Value)
-        EspInterface.sharedSettings.showPriorities = Value
-    end
-})
-
-local ControlSection = Page:Section({
-    Name = "Controls",
-    Side = 2
-})
-
-ControlSection:Button({
-    Name = "Load ESP",
-    Callback = function()
-        if not EspInterface._hasLoaded then
-            EspInterface.Load()
-            Library:Notification("ESP Loaded", 3, Color3.fromRGB(0, 255, 100))
-        else
-            Library:Notification("ESP already loaded", 3, Color3.fromRGB(255, 170, 0))
+local WeaponCache = {}
+local WeaponsFolder = replicatedStorage:FindFirstChild("Weapons")
+if not WeaponsFolder then
+    WeaponsFolder = replicatedStorage:FindFirstChild("WeaponModules")
+end
+if WeaponsFolder then
+    for _, weapon in next, WeaponsFolder:GetChildren() do
+        if weapon:IsA("Folder") or weapon:IsA("Configuration") or weapon:IsA("ModuleScript") then
+            WeaponCache[weapon.Name] = {
+                Auto = weapon:GetAttribute("Auto"),
+                FireRate = weapon:GetAttribute("FireRate"),
+                RecoilX = weapon:GetAttribute("RecoilX"),
+                RecoilY = weapon:GetAttribute("RecoilY"),
+                Spread = weapon:GetAttribute("Spread"),
+                Ammo = weapon:GetAttribute("Ammo"),
+                StoredAmmo = weapon:GetAttribute("StoredAmmo"),
+                Damage = weapon:GetAttribute("Damage"),
+                ReloadTime = weapon:GetAttribute("ReloadTime"),
+                Headshot = weapon:GetAttribute("Headshot")
+            }
         end
     end
+end
+
+local s = Library
+local t = s.Flags
+
+local Window = s:Window({
+    Name = "A R S E N A L",
+    Size = UDim2.new(0, 593, 0, 800),
+    GradientTitle = {
+        Enabled = true,
+        Start = Color3.fromRGB(255, 255, 255),
+        Middle = Color3.fromRGB(255, 80, 80),
+        End = Color3.fromRGB(255, 80, 80),
+        Speed = 1
+    }
 })
 
-ControlSection:Button({
-    Name = "Unload ESP",
-    Risky = true,
-    Callback = function()
-        if EspInterface._hasLoaded then
-            EspInterface.Unload()
-            Library:Notification("ESP Unloaded", 3, Color3.fromRGB(255, 50, 50))
-        else
-            Library:Notification("ESP not loaded", 3, Color3.fromRGB(255, 170, 0))
+local Watermark = s:Watermark("Arsenal | Loaded", {"91814125975782", Color3.new(1, 1, 1)})
+Watermark:SetVisibility(true)
+
+local KeybindList = s:KeybindList()
+KeybindList:SetVisibility(false)
+
+local LegitPage = Window:Page({Name = "Legit", Columns = 2})
+local RagePage = Window:Page({Name = "Rage", Columns = 2})
+local VisualsPage = Window:Page({Name = "Visuals", Columns = 2})
+local MiscPage = Window:Page({Name = "Misc", Columns = 2})
+local PlayersPage = Window:Page({Name = "Players", Columns = 1})
+local SettingsPage = Window:Page({Name = "Settings", Columns = 2})
+
+local LegitFovCircle = Drawing.new("Circle")
+LegitFovCircle.ZIndex = 2
+LegitFovCircle.Visible = false
+LegitFovCircle.Thickness = 1
+LegitFovCircle.NumSides = 100
+LegitFovCircle.Filled = false
+
+local RageFovCircle = Drawing.new("Circle")
+RageFovCircle.ZIndex = 2
+RageFovCircle.Visible = false
+RageFovCircle.Thickness = 1
+RageFovCircle.NumSides = 100
+RageFovCircle.Filled = false
+
+local SilentAimTarget = nil
+local SilentAimPart = nil
+
+local function getTarget(useFov, fovValue, hitscan)
+    local closest = math.huge
+    local target = nil
+    local targetPart = nil
+    local scanParts = {}
+
+    if hitscan == "Head" then
+        scanParts = {"Head"}
+    elseif hitscan == "Torso" then
+        scanParts = {"HumanoidRootPart", "Torso", "UpperTorso"}
+    elseif type(hitscan) == "table" then
+        scanParts = hitscan
+    else
+        scanParts = {"Head"}
+    end
+
+    local mousePos = userInputService:GetMouseLocation()
+    local fovRadius = (camera.ViewportSize.X * ((fovValue / 2) / camera.FieldOfView)) / 2
+
+    for _, player in next, players:GetPlayers() do
+        if player == localPlayer or not isAlive(player) then continue end
+        if isFriendly(player) then continue end
+
+        local character = player.Character
+        local part = nil
+        for _, partName in next, scanParts do
+            part = character:FindFirstChild(partName)
+            if part then break end
+        end
+        if not part then continue end
+
+        local screenPos, onScreen = camera:WorldToViewportPoint(part.Position)
+        if not onScreen then continue end
+
+        local distance = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+        if useFov and distance > fovRadius then continue end
+
+        if distance < closest then
+            closest = distance
+            target = player
+            targetPart = part
         end
     end
-})
 
-Library:Watermark("ESP Script | Loaded")
+    return target, targetPart
+end
+
+do
+    local BulletSection = LegitPage:Section({Name = "Bullet Redirection", Side = 1})
+    if Client.HasHookmetamethod and Client.HasGetnamecallmethod and Client.HasNewcclosure then
+        BulletSection:Toggle({
+            Name = "Enabled",
+            Flag = "Legit/SilentAim",
+            Default = false,
+            Tooltip = "Master switch for silent aim, redirects bullets to target"
+        })
+        BulletSection:Slider({
+            Name = "Hit Chance",
+            Flag = "Legit/SilentAim/HitChance",
+            Min = 0, Default = 100, Max = 100,
+            Suffix = "%", Decimals = 1,
+            Tooltip = "Chance of silent aim activating per shot"
+        })
+    else
+        BulletSection:Label({Text = "Unsupported", Alignment = "Left", Tooltip = "Your exploit doesn't support hookmetamethod, no Silent Aim for you"})
+    end
+
+    local AimSection = LegitPage:Section({Name = "Aim Assist", Side = 2})
+    AimSection:Toggle({
+        Name = "Enabled",
+        Flag = "Legit/Aimbot",
+        Default = false,
+        Tooltip = "Master switch for aim assist"
+    })
+    AimSection:Slider({
+        Name = "Speed",
+        Flag = "Legit/Aimbot/Speed",
+        Min = 0, Default = 10, Max = 100,
+        Suffix = "%", Decimals = 1,
+        Tooltip = "How fast aim assist moves your mouse"
+    })
+    AimSection:Dropdown({
+        Name = "Aim Type",
+        Flag = "Legit/Aimbot/Type",
+        Items = {"Mouse Movement", "Lerp", "Stick"},
+        Multi = false, Default = "Mouse Movement",
+        Tooltip = "Mouse Movement - moves mouse, Lerp - smooth camera, Stick - instant snap"
+    })
+    AimSection:Dropdown({
+        Name = "Speed Type",
+        Flag = "Legit/Aimbot/SpeedType",
+        Items = {"Linear", "Exponential"},
+        Multi = false, Default = "Linear",
+        Tooltip = "Only affects Lerp aim type"
+    })
+    AimSection:Dropdown({
+        Name = "Activation",
+        Flag = "Legit/Aimbot/Activate",
+        Items = {"Mouse 1", "Mouse 2"},
+        Multi = false, Default = "Mouse 1",
+        Tooltip = "Button to hold for aim assist"
+    })
+
+    local TriggerSection = LegitPage:Section({Name = "Trigger Bot", Side = 2})
+    local TriggerToggle = TriggerSection:Toggle({
+        Name = "Enabled",
+        Flag = "Legit/Triggerbot",
+        Default = false,
+        Tooltip = "Auto-shoot when crosshair is on enemy, use bind to activate"
+    })
+    TriggerToggle:Keybind({
+        Name = "Trigger Bot",
+        Flag = "Legit/Triggerbot/Bind",
+        Mode = "Hold"
+    })
+    TriggerSection:Slider({
+        Name = "Delay",
+        Flag = "Legit/Triggerbot/Delay",
+        Min = 0, Default = 0, Max = 200,
+        Suffix = "ms", Decimals = 1,
+        Tooltip = "Delay before trigger bot fires"
+    })
+
+    local SettingsSection = LegitPage:Section({Name = "Settings", Side = 1})
+    SettingsSection:Toggle({
+        Name = "Use FOV",
+        Flag = "Legit/Fov",
+        Default = false,
+        Tooltip = "Only target enemies within FOV circle"
+    })
+    local FovVisToggle = SettingsSection:Toggle({
+        Name = "Visible FOV",
+        Flag = "Legit/Fov/Visible",
+        Default = false,
+        Tooltip = "Show FOV circle"
+    })
+    FovVisToggle:Colorpicker({
+        Name = "FOV Circle Color",
+        Flag = "Legit/Fov/Color",
+        Default = Color3.new(1, 1, 1)
+    })
+    SettingsSection:Slider({
+        Name = "FOV",
+        Flag = "Legit/Fov/Value",
+        Min = 0, Default = 25, Max = 80,
+        Suffix = "\u{b0}", Decimals = 1,
+        Tooltip = "Enemies within this FOV will be targeted"
+    })
+    SettingsSection:Slider({
+        Name = "FOV Num Sides",
+        Flag = "Legit/Fov/NumSides",
+        Min = 0, Default = 100, Max = 100,
+        Tooltip = "Changes FOV circle smoothness"
+    })
+    SettingsSection:Dropdown({
+        Name = "Hitscan",
+        Flag = "Legit/Hitscan",
+        Items = {"Head", "Torso"},
+        Multi = false, Default = "Head",
+        Tooltip = "Hitbox to aim at"
+    })
+end
+
+do
+    local RageSection = RagePage:Section({Name = "Rage Bot", Side = 1})
+    RageSection:Toggle({
+        Name = "Enabled",
+        Flag = "Rage/Ragebot",
+        Default = false,
+        Risky = true,
+        Tooltip = "Master switch for rage bot, auto-shoots enemies"
+    })
+    RageSection:Toggle({
+        Name = "Silent Aim",
+        Flag = "Rage/SilentAim",
+        Default = false,
+        Tooltip = "Makes rage bot shots locally invisible"
+    })
+    RageSection:Toggle({
+        Name = "Auto Wall",
+        Flag = "Rage/AutoWall",
+        Default = false,
+        Tooltip = "Shoot through wallbangable surfaces"
+    })
+    RageSection:Toggle({
+        Name = "Force Full Damage",
+        Flag = "Rage/ForceDamage",
+        Default = false,
+        Tooltip = "Ignore damage falloff through walls"
+    })
+    RageSection:Slider({
+        Name = "Minimum Damage",
+        Flag = "Rage/MinDamage",
+        Min = 1, Default = 80, Max = 200,
+        Tooltip = "Minimum damage before shooting"
+    })
+    RageSection:Dropdown({
+        Name = "Hitscan",
+        Flag = "Rage/Hitscan",
+        Items = {"Head", "Torso", "Arms", "Legs"},
+        Multi = true, Default = "Head",
+        Tooltip = "Hitboxes to consider"
+    })
+
+    local RageMisc = RagePage:Section({Name = "Miscellaneous", Side = 2})
+    RageMisc:Toggle({
+        Name = "Debug",
+        Flag = "Rage/Debug",
+        Default = false,
+        Tooltip = "Show notification after shooting"
+    })
+    RageMisc:Toggle({
+        Name = "Use FOV",
+        Flag = "Rage/Fov",
+        Default = false,
+        Tooltip = "Limit targets to FOV circle"
+    })
+    local RageFovVis = RageMisc:Toggle({
+        Name = "Visible FOV",
+        Flag = "Rage/Fov/Visible",
+        Default = false,
+        Tooltip = "Show FOV circle"
+    })
+    RageFovVis:Colorpicker({
+        Name = "FOV Circle Color",
+        Flag = "Rage/Fov/Color",
+        Default = Color3.new(1, 1, 1)
+    })
+    RageMisc:Slider({
+        Name = "FOV",
+        Flag = "Rage/Fov/Value",
+        Min = 0, Default = 25, Max = 80,
+        Suffix = "\u{b0}", Decimals = 1,
+        Tooltip = "Rage bot FOV"
+    })
+    RageMisc:Slider({
+        Name = "FOV Num Sides",
+        Flag = "Rage/Fov/NumSides",
+        Min = 0, Default = 100, Max = 100,
+        Tooltip = "Changes FOV circle smoothness"
+    })
+    RageMisc:Toggle({
+        Name = "Rapid Fire",
+        Flag = "Rage/RapidFire",
+        Default = false,
+        Tooltip = "Ignore weapon fire rate"
+    })
+    RageMisc:Toggle({
+        Name = "Force Headshot",
+        Flag = "Rage/ForceHead",
+        Default = false,
+        Tooltip = "Every shot registers as headshot"
+    })
+    RageMisc:Toggle({
+        Name = "Double Tap",
+        Flag = "Rage/DoubleTap",
+        Default = false,
+        Tooltip = "Fire two quick shots"
+    })
+
+    local KnifeSection = RagePage:Section({Name = "Knife Bot", Side = 1})
+    KnifeSection:Toggle({
+        Name = "Enabled",
+        Flag = "Rage/Knifebot",
+        Default = false,
+        Tooltip = "Auto-stab enemies when in range"
+    })
+    KnifeSection:Toggle({
+        Name = "Wall Check",
+        Flag = "Rage/Knifebot/WallCheck",
+        Default = false,
+        Tooltip = "Only stab visible enemies"
+    })
+    KnifeSection:Slider({
+        Name = "Radius",
+        Flag = "Rage/Knifebot/Radius",
+        Min = 0, Default = 7, Max = 15,
+        Suffix = "st", Decimals = 1,
+        Tooltip = "Stab range in studs"
+    })
+
+    local AntiAimSection = RagePage:Section({Name = "Anti Aim", Side = 2})
+    AntiAimSection:Toggle({
+        Name = "Enabled",
+        Flag = "Rage/AntiAim",
+        Default = false,
+        Tooltip = "Serverside yaw/pitch spoofing"
+    })
+    local DisableAALabel = AntiAimSection:Label({Text = "Disable On", Alignment = "Left", Tooltip = "Keybind to temporarily disable anti aim"})
+    DisableAALabel:Keybind({
+        Name = "Disable Anti Aim",
+        Flag = "Rage/AntiAim/Disable"
+    })
+    AntiAimSection:Dropdown({
+        Name = "Yaw Base",
+        Flag = "Rage/AntiAim/Yaw",
+        Items = {"Camera", "Spin", "Random"},
+        Multi = false, Default = "Camera",
+        Tooltip = "Horizontal rotation mode"
+    })
+    AntiAimSection:Slider({
+        Name = "Spin Speed",
+        Flag = "Rage/AntiAim/SpinSpeed",
+        Min = 0, Default = 3, Max = 48,
+        Tooltip = "Spin rotation speed"
+    })
+    AntiAimSection:Slider({
+        Name = "Custom Yaw",
+        Flag = "Rage/AntiAim/CustomYaw",
+        Min = -180, Default = 0, Max = 180,
+        Suffix = "\u{b0}", Decimals = 1,
+        Tooltip = "Custom horizontal angle"
+    })
+    AntiAimSection:Slider({
+        Name = "Custom Pitch",
+        Flag = "Rage/AntiAim/CustomPitch",
+        Min = -100, Default = 0, Max = 100,
+        Suffix = "\u{b0}", Decimals = 1,
+        Tooltip = "Custom vertical angle"
+    })
+end
+
+do
+    local F = EspInterface.teamSettings.enemy
+    local EnemySection = VisualsPage:Section({Name = "Enemy ESP", Side = 1})
+
+    EnemySection:Toggle({
+        Name = "Enabled",
+        Flag = "Visuals/Esp",
+        Default = false,
+        Tooltip = "Master switch for enemy ESP",
+        Callback = function(Value) F.enabled = Value end
+    })
+
+    local BoxT = EnemySection:Toggle({
+        Name = "Bounding Box",
+        Flag = "Visuals/Esp/Box",
+        Default = false,
+        Tooltip = "Show enemy boxes",
+        Callback = function(Value)
+            if t["Visuals/Esp/Box/Type"] == "3D" then
+                F.box3d = Value; F.box = false
+            else
+                F.box = Value; F.box3d = false
+            end
+            F.boxColor[1] = Color3.fromHex(t["Visuals/Esp/Box/Color"].HexValue)
+        end
+    })
+    BoxT:Colorpicker({
+        Name = "Box Color",
+        Flag = "Visuals/Esp/Box/Color",
+        Default = Color3.new(1, 0, 0),
+        Callback = function()
+            if t["Visuals/Esp/Box/Type"] == "3D" then
+                F.box3dColor[1] = Color3.fromHex(t["Visuals/Esp/Box/Color"].HexValue)
+            else
+                F.boxColor[1] = Color3.fromHex(t["Visuals/Esp/Box/Color"].HexValue)
+            end
+        end
+    })
+    EnemySection:Dropdown({
+        Name = "Box Type",
+        Flag = "Visuals/Esp/Box/Type",
+        Items = {"Default", "3D"},
+        Multi = false, Default = "Default",
+        Tooltip = "2D or 3D bounding box"
+    })
+
+    local BoxFillT = EnemySection:Toggle({
+        Name = "Box Fill",
+        Flag = "Visuals/Esp/BoxFill",
+        Default = false,
+        Callback = function(Value) F.boxFill = Value end
+    })
+    BoxFillT:Colorpicker({
+        Name = "Fill Color",
+        Flag = "Visuals/Esp/BoxFill/Color",
+        Default = Color3.new(1, 0, 0),
+        Alpha = 0.5,
+        Callback = function()
+            F.boxFillColor[1] = Color3.fromHex(t["Visuals/Esp/BoxFill/Color"].HexValue)
+            F.boxFillColor[2] = t["Visuals/Esp/BoxFill/Color"].Alpha
+        end
+    })
+
+    local NameT = EnemySection:Toggle({
+        Name = "Name",
+        Flag = "Visuals/Esp/Name",
+        Default = false,
+        Callback = function(Value) F.name = Value end
+    })
+    NameT:Colorpicker({
+        Name = "Name Color",
+        Flag = "Visuals/Esp/Name/Color",
+        Default = Color3.new(1, 1, 1),
+        Callback = function() F.nameColor[1] = Color3.fromHex(t["Visuals/Esp/Name/Color"].HexValue) end
+    })
+
+    local WeaponT = EnemySection:Toggle({
+        Name = "Weapon",
+        Flag = "Visuals/Esp/Weapon",
+        Default = false,
+        Callback = function(Value) F.weapon = Value end
+    })
+    WeaponT:Colorpicker({
+        Name = "Weapon Color",
+        Flag = "Visuals/Esp/Weapon/Color",
+        Default = Color3.new(1, 1, 1),
+        Callback = function() F.weaponColor[1] = Color3.fromHex(t["Visuals/Esp/Weapon/Color"].HexValue) end
+    })
+
+    local DistT = EnemySection:Toggle({
+        Name = "Distance",
+        Flag = "Visuals/Esp/Distance",
+        Default = false,
+        Callback = function(Value) F.distance = Value end
+    })
+    DistT:Colorpicker({
+        Name = "Distance Color",
+        Flag = "Visuals/Esp/Distance/Color",
+        Default = Color3.new(1, 1, 1),
+        Callback = function() F.distanceColor[1] = Color3.fromHex(t["Visuals/Esp/Distance/Color"].HexValue) end
+    })
+
+    local HealthT = EnemySection:Toggle({
+        Name = "Health Bar",
+        Flag = "Visuals/Esp/HealthBar",
+        Default = false,
+        Callback = function(Value) F.healthBar = Value end
+    })
+    HealthT:Colorpicker({
+        Name = "Full Health",
+        Flag = "Visuals/Esp/HealthBar/FullColor",
+        Default = Color3.new(0, 1, 0),
+        Callback = function() F.healthyColor = Color3.fromHex(t["Visuals/Esp/HealthBar/FullColor"].HexValue) end
+    })
+    HealthT:Colorpicker({
+        Name = "Dying Health",
+        Flag = "Visuals/Esp/HealthBar/DyingColor",
+        Default = Color3.new(1, 0, 0),
+        Callback = function() F.dyingColor = Color3.fromHex(t["Visuals/Esp/HealthBar/DyingColor"].HexValue) end
+    })
+
+    local HealthNumT = EnemySection:Toggle({
+        Name = "Health Number",
+        Flag = "Visuals/Esp/HealthNumber",
+        Default = false,
+        Callback = function(Value) F.healthText = Value end
+    })
+    HealthNumT:Colorpicker({
+        Name = "Health Text Color",
+        Flag = "Visuals/Esp/HealthNumber/Color",
+        Default = Color3.new(1, 1, 1),
+        Callback = function() F.healthTextColor[1] = Color3.fromHex(t["Visuals/Esp/HealthNumber/Color"].HexValue) end
+    })
+
+    local TracerT = EnemySection:Toggle({
+        Name = "Tracer",
+        Flag = "Visuals/Esp/Tracer",
+        Default = false,
+        Callback = function(Value) F.tracer = Value end
+    })
+    TracerT:Colorpicker({
+        Name = "Tracer Color",
+        Flag = "Visuals/Esp/Tracer/Color",
+        Default = Color3.new(1, 0, 0),
+        Callback = function() F.tracerColor[1] = Color3.fromHex(t["Visuals/Esp/Tracer/Color"].HexValue) end
+    })
+    EnemySection:Dropdown({
+        Name = "Tracer Origin",
+        Flag = "Visuals/Esp/Tracer/Origin",
+        Items = {"Bottom", "Middle", "Top"},
+        Multi = false, Default = "Bottom",
+        Callback = function(Value) F.tracerOrigin = Value end
+    })
+
+    local ChamsT = EnemySection:Toggle({
+        Name = "Chams",
+        Flag = "Visuals/Esp/Chams",
+        Default = false,
+        Callback = function(Value) F.chams = Value end
+    })
+    ChamsT:Colorpicker({
+        Name = "Visible Cham",
+        Flag = "Visuals/Esp/Chams/VisibleColor",
+        Default = Color3.new(1, 1, 1),
+        Alpha = 0,
+        Callback = function(_, A)
+            F.chamsOutlineColor[1] = Color3.fromHex(t["Visuals/Esp/Chams/VisibleColor"].HexValue)
+            F.chamsOutlineColor[2] = A
+        end
+    })
+    ChamsT:Colorpicker({
+        Name = "Invisible Cham",
+        Flag = "Visuals/Esp/Chams/InvisibleColor",
+        Default = Color3.fromRGB(255, 80, 80),
+        Alpha = 0.5,
+        Callback = function(_, A)
+            F.chamsFillColor[1] = Color3.fromHex(t["Visuals/Esp/Chams/InvisibleColor"].HexValue)
+            F.chamsFillColor[2] = A
+        end
+    })
+
+    local G = EspInterface.teamSettings.friendly
+    local FriendlySection = VisualsPage:Section({Name = "Friendly ESP", Side = 2})
+
+    FriendlySection:Toggle({
+        Name = "Enabled",
+        Flag = "Esp/Friendly/Enabled",
+        Default = false,
+        Callback = function(Value) G.enabled = Value end
+    })
+
+    local FriendlyBoxT = FriendlySection:Toggle({
+        Name = "Bounding Box",
+        Flag = "Esp/Friendly/Box",
+        Default = false,
+        Callback = function(Value)
+            G.box = Value
+            G.boxColor[1] = Color3.fromHex(t["Esp/Friendly/Box/Color"].HexValue)
+        end
+    })
+    FriendlyBoxT:Colorpicker({
+        Name = "Box Color",
+        Flag = "Esp/Friendly/Box/Color",
+        Default = Color3.new(0, 1, 0),
+        Callback = function() G.boxColor[1] = Color3.fromHex(t["Esp/Friendly/Box/Color"].HexValue) end
+    })
+
+    local FriendlyNameT = FriendlySection:Toggle({
+        Name = "Name",
+        Flag = "Esp/Friendly/Name",
+        Default = false,
+        Callback = function(Value) G.name = Value end
+    })
+    FriendlyNameT:Colorpicker({
+        Name = "Name Color",
+        Flag = "Esp/Friendly/Name/Color",
+        Default = Color3.new(1, 1, 1),
+        Callback = function() G.nameColor[1] = Color3.fromHex(t["Esp/Friendly/Name/Color"].HexValue) end
+    })
+
+    local FriendlyHealthT = FriendlySection:Toggle({
+        Name = "Health Bar",
+        Flag = "Esp/Friendly/HealthBar",
+        Default = false,
+        Callback = function(Value) G.healthBar = Value end
+    })
+    FriendlyHealthT:Colorpicker({
+        Name = "Full Health",
+        Flag = "Esp/Friendly/HealthBar/Full",
+        Default = Color3.new(0, 1, 0),
+        Callback = function() G.healthyColor = Color3.fromHex(t["Esp/Friendly/HealthBar/Full"].HexValue) end
+    })
+    FriendlyHealthT:Colorpicker({
+        Name = "Low Health",
+        Flag = "Esp/Friendly/HealthBar/Low",
+        Default = Color3.new(1, 0, 0),
+        Callback = function() G.dyingColor = Color3.fromHex(t["Esp/Friendly/HealthBar/Low"].HexValue) end
+    })
+
+    local FriendlyTracerT = FriendlySection:Toggle({
+        Name = "Tracer",
+        Flag = "Esp/Friendly/Tracer",
+        Default = false,
+        Callback = function(Value) G.tracer = Value end
+    })
+    FriendlyTracerT:Colorpicker({
+        Name = "Tracer Color",
+        Flag = "Esp/Friendly/Tracer/Color",
+        Default = Color3.new(0, 1, 0),
+        Callback = function() G.tracerColor[1] = Color3.fromHex(t["Esp/Friendly/Tracer/Color"].HexValue) end
+    })
+
+    local EspSettings = VisualsPage:Section({Name = "ESP Settings", Side = 2})
+    EspSettings:Dropdown({
+        Name = "Text Font",
+        Flag = "Visuals/Esp/TextFont",
+        Items = {"Plex", "System", "Monospace", "UI"},
+        Multi = false, Default = "Plex",
+        Tooltip = "ESP text font",
+        Callback = function(Value)
+            local Map = {Plex = 1, System = 2, Monospace = 3, UI = 4}
+            EspInterface.sharedSettings.textFont = Map[Value] or 1
+        end
+    })
+    EspSettings:Slider({
+        Name = "Text Size",
+        Flag = "Visuals/Esp/TextSize",
+        Min = 0, Default = 13, Max = 50,
+        Tooltip = "ESP text size",
+        Callback = function(Value) EspInterface.sharedSettings.textSize = Value end
+    })
+    EspSettings:Toggle({
+        Name = "Limit Distance",
+        Flag = "Esp/Settings/LimitDistance",
+        Default = false,
+        Callback = function(Value) EspInterface.sharedSettings.limitDistance = Value end
+    })
+    EspSettings:Slider({
+        Name = "Max Distance",
+        Flag = "Esp/Settings/MaxDistance",
+        Min = 50, Default = 1000, Max = 5000,
+        Suffix = " studs",
+        Callback = function(Value) EspInterface.sharedSettings.maxDistance = Value end
+    })
+
+    local PriorityT = EspSettings:Toggle({
+        Name = "Highlight Priorities",
+        Flag = "Visuals/Esp/ShowPriorities",
+        Default = false,
+        Tooltip = "Highlight priority players in Players tab",
+        Callback = function(Value)
+            EspInterface.sharedSettings.showPriorities = Value
+            if Value then
+                for _, P in next, s.Lists.Priority do
+                    if not table.find(EspInterface.priorities, P.UserId) then
+                        table.insert(EspInterface.priorities, P.UserId)
+                    end
+                end
+            else
+                table.clear(EspInterface.priorities)
+            end
+        end
+    })
+    PriorityT:Colorpicker({
+        Name = "Priority Color",
+        Flag = "Visuals/Esp/ShowPriorities/Color",
+        Default = Color3.fromRGB(245, 239, 120),
+        Callback = function() EspInterface.sharedSettings.prioritiesColor = Color3.fromHex(t["Visuals/Esp/ShowPriorities/Color"].HexValue) end
+    })
+
+    EspInterface.Load()
+
+    local WorldSection = VisualsPage:Section({Name = "World", Side = 1})
+    local AmbientT = WorldSection:Toggle({
+        Name = "Ambient",
+        Flag = "Visuals/Ambient",
+        Default = false,
+        Tooltip = "Custom world lighting",
+        Callback = function(Value)
+            if not Value then
+                lighting.Ambient = Color3.fromRGB(127, 127, 127)
+                lighting.OutdoorAmbient = Color3.fromRGB(127, 127, 127)
+            end
+        end
+    })
+    AmbientT:Colorpicker({Name = "Ambient Color", Flag = "Visuals/Ambient/AmbientColor", Default = Color3.fromRGB(255, 80, 80)})
+    AmbientT:Colorpicker({Name = "Outdoor Color", Flag = "Visuals/Ambient/OutdoorAmbientColor", Default = Color3.fromRGB(200, 80, 80)})
+
+    WorldSection:Toggle({
+        Name = "No Flash",
+        Flag = "Visuals/NoFlash",
+        Default = false,
+        Tooltip = "Remove flashbang whiteout"
+    })
+    WorldSection:Toggle({
+        Name = "No Smoke",
+        Flag = "Visuals/NoSmoke",
+        Default = false,
+        Tooltip = "Remove smoke particles"
+    })
+
+    WorldSection:Toggle({
+        Name = "Time Changer",
+        Flag = "Visuals/TimeChanger",
+        Default = false,
+        Tooltip = "Override map time",
+        Callback = function(Value)
+            if not Value then lighting.ClockTime = 12 end
+        end
+    })
+    WorldSection:Slider({
+        Name = "Time",
+        Flag = "Visuals/TimeChanger/Time",
+        Min = 0, Default = 12, Max = 24,
+        Suffix = "h", Decimals = 1,
+        Tooltip = "Map clock time"
+    })
+
+    WorldSection:Toggle({
+        Name = "Fullbright",
+        Flag = "Visuals/Fullbright",
+        Default = false,
+        Tooltip = "Max brightness, no shadows"
+    })
+
+    local ViewmodelSection = VisualsPage:Section({Name = "Viewmodel", Side = 1})
+    ViewmodelSection:Toggle({
+        Name = "Viewmodel Offset",
+        Flag = "Visuals/Viewmodel",
+        Default = false,
+        Tooltip = "Shift gun position"
+    })
+    ViewmodelSection:Slider({
+        Name = "Offset X",
+        Flag = "Visuals/Viewmodel/X",
+        Min = -180, Default = 0, Max = 180,
+        Tooltip = "X axis offset"
+    })
+    ViewmodelSection:Slider({
+        Name = "Offset Y",
+        Flag = "Visuals/Viewmodel/Y",
+        Min = -180, Default = 0, Max = 180,
+        Tooltip = "Y axis offset"
+    })
+    ViewmodelSection:Slider({
+        Name = "Offset Z",
+        Flag = "Visuals/Viewmodel/Z",
+        Min = -180, Default = 0, Max = 180,
+        Tooltip = "Z axis offset"
+    })
+
+    local SelfSection = VisualsPage:Section({Name = "Self", Side = 2})
+    local ThirdT = SelfSection:Toggle({
+        Name = "Third Person",
+        Flag = "Visuals/ThirdPerson",
+        Default = false,
+        Tooltip = "Toggle third person camera, use bind"
+    })
+    ThirdT:Keybind({Name = "Third Person", Flag = "Visuals/ThirdPerson/Bind"})
+    SelfSection:Slider({
+        Name = "Distance",
+        Flag = "Visuals/ThirdPerson/Distance",
+        Min = 1, Default = 9, Max = 20,
+        Tooltip = "Third person camera distance"
+    })
+end
+
+do
+    local MoveSection = MiscPage:Section({Name = "Movement", Side = 1})
+    MoveSection:Toggle({
+        Name = "Automatic Jump",
+        Flag = "Misc/AutoJump",
+        Default = false,
+        Tooltip = "Bunnyhop when holding space"
+    })
+    MoveSection:Toggle({
+        Name = "Noclip",
+        Flag = "Misc/Noclip",
+        Default = false,
+        Tooltip = "Walk through walls"
+    })
+    MoveSection:Toggle({
+        Name = "Speed Hack",
+        Flag = "Misc/SpeedHack",
+        Default = false,
+        Tooltip = "Increased movement speed"
+    })
+    MoveSection:Slider({
+        Name = "Speed",
+        Flag = "Misc/SpeedHack/Speed",
+        Min = 16, Default = 40, Max = 250,
+        Suffix = "st", Decimals = 1,
+        Tooltip = "Movement speed multiplier"
+    })
+    local AirT = MoveSection:Toggle({
+        Name = "Airstuck",
+        Flag = "Misc/Airstuck",
+        Default = false,
+        Tooltip = "Freeze in air, use bind"
+    })
+    AirT:Keybind({Name = "Airstuck", Flag = "Misc/Airstuck/Bind", Mode = "Hold"})
+
+    local ExploitSection = MiscPage:Section({Name = "Exploits", Side = 1})
+    ExploitSection:Toggle({
+        Name = "Kill All",
+        Flag = "Misc/KillAll",
+        Default = false,
+        Risky = true,
+        Tooltip = "Rapid fire at all enemies"
+    })
+    ExploitSection:Slider({
+        Name = "Hit Per Second",
+        Flag = "Misc/KillAll/HPS",
+        Min = 1, Default = 1, Max = 10,
+        Suffix = "hps", Decimals = 0.5,
+        Tooltip = "Fire rate for kill all"
+    })
+
+    local ChatSection = MiscPage:Section({Name = "Chat", Side = 2})
+    ChatSection:Toggle({
+        Name = "Chat Spammer",
+        Flag = "Misc/ChatSpam",
+        Default = false,
+        Tooltip = "Auto-send messages every 3s"
+    })
+    ChatSection:Dropdown({
+        Name = "Message Type",
+        Flag = "Misc/ChatSpam/Type",
+        Items = {"Arsenal", "Advertise", "Custom"},
+        Multi = false, Default = "Arsenal",
+        Tooltip = "Spam message type"
+    })
+    ChatSection:Textbox({
+        Name = "Custom Message",
+        Flag = "Misc/ChatSpam/Custom",
+        Default = "Arsenal on top!!",
+        Placeholder = "..."
+    })
+
+    local GunSection = MiscPage:Section({Name = "Gun Mods", Side = 2})
+    GunSection:Toggle({
+        Name = "No Recoil",
+        Flag = "Misc/GunMods/NoRecoil",
+        Default = false,
+        Tooltip = "Remove weapon recoil"
+    })
+    GunSection:Toggle({
+        Name = "No Spread",
+        Flag = "Misc/GunMods/NoSpread",
+        Default = false,
+        Tooltip = "Remove bullet spread"
+    })
+    GunSection:Toggle({
+        Name = "Full Auto",
+        Flag = "Misc/GunMods/FullAuto",
+        Default = false,
+        Tooltip = "All guns become automatic"
+    })
+    GunSection:Toggle({
+        Name = "Rapid Fire",
+        Flag = "Misc/GunMods/RapidFire",
+        Default = false,
+        Tooltip = "Max fire rate"
+    })
+    GunSection:Toggle({
+        Name = "Infinite Ammo",
+        Flag = "Misc/GunMods/InfAmmo",
+        Default = false,
+        Tooltip = "Never run out of ammo"
+    })
+end
+
+do
+    PlayersPage:PlayerList({Name = "Player List", Flag = "PlayerList"})
+
+    local PrioritySection = PlayersPage:Section({Name = "Priority", Side = 1})
+    PrioritySection:Toggle({
+        Name = "Kill",
+        Flag = "Players/Priority/Kill",
+        Default = false,
+        Tooltip = "Only kill priority-marked players"
+    })
+    PrioritySection:Slider({
+        Name = "Hit Per Second",
+        Flag = "Players/Priority/Kill/HPS",
+        Min = 1, Default = 1, Max = 10,
+        Suffix = "hps", Decimals = 0.5,
+        Tooltip = "Fire rate for priority kill"
+    })
+end
+
+do
+    local ThemeSection = SettingsPage:Section({Name = "Theme", Side = 1})
+    for Name, Color in next, s.Theme do
+        s.ThemeColorpickers[Name] = ThemeSection:Label({
+            Text = Name, Alignment = "Left"
+        }):Colorpicker({
+            Name = Name,
+            Flag = "Theme" .. Name,
+            Default = Color,
+            Callback = function(Value)
+                s.Theme[Name] = Value
+                s:ChangeTheme(Name, Value)
+            end
+        })
+    end
+    ThemeSection:Dropdown({
+        Name = "Presets",
+        Flag = "Theme/Preset",
+        Items = {"Default", "Bitchbot", "Onetap", "Aqua"},
+        Multi = false, Default = "Default",
+        Callback = function(Value)
+            local Preset = s.Themes[Value]
+            if not Preset then return end
+            for Name, Color in next, s.Theme do
+                s.Theme[Name] = Preset[Name]
+                s:ChangeTheme(Name, Preset[Name])
+                s.ThemeColorpickers[Name]:Set(Preset[Name])
+            end
+            task.wait(0.3)
+            s:Thread(function()
+                for Name, _ in next, s.Theme do
+                    s.Theme[Name] = s.Flags["Theme" .. Name].Color
+                    s:ChangeTheme(Name, s.Flags["Theme" .. Name].Color)
+                end
+            end)
+        end
+    })
+
+    local ConfigSection = SettingsPage:Section({Name = "Configs", Side = 2})
+    local ConfigName, SelectedConfig
+    local ConfigList = ConfigSection:Listbox({
+        Name = "Configs",
+        Flag = "configs_list",
+        Items = {},
+        Multi = false,
+        Callback = function(Value) SelectedConfig = Value end
+    })
+    ConfigSection:Textbox({
+        Name = "Name",
+        Flag = "Config Name",
+        Default = "",
+        Placeholder = "...",
+        Callback = function(Value) ConfigName = Value end
+    })
+    ConfigSection:Button({
+        Name = "Load Config",
+        Callback = function()
+            if SelectedConfig then
+                s:LoadConfig(readfile(s.Folders.Configs .. "/" .. SelectedConfig))
+            end
+            task.wait(0.1)
+            s:Thread(function()
+                for Name, _ in next, s.Theme do
+                    s.Theme[Name] = s.Flags["Theme" .. Name].Color
+                    s:ChangeTheme(Name, s.Flags["Theme" .. Name].Color)
+                end
+            end)
+        end
+    }):SubButton({
+        Name = "Save Config",
+        Callback = function()
+            if SelectedConfig then s:SaveConfig(SelectedConfig) end
+        end
+    })
+    ConfigSection:Button({
+        Name = "Create Config",
+        Callback = function()
+            if ConfigName == "" then return end
+            if not isfile(s.Folders.Configs .. "/" .. ConfigName .. ".json") then
+                writefile(s.Folders.Configs .. "/" .. ConfigName .. ".json", s:GetConfig())
+                s:RefreshConfigsList(ConfigList)
+            else
+                s:Notification("Config already exists", 3, Color3.fromRGB(255, 0, 0))
+            end
+        end
+    }):SubButton({
+        Name = "Delete Config",
+        Callback = function()
+            if SelectedConfig then
+                s:DeleteConfig(SelectedConfig)
+                s:RefreshConfigsList(ConfigList)
+            end
+        end
+    })
+    ConfigSection:Button({
+        Name = "Refresh Configs",
+        Callback = function() s:RefreshConfigsList(ConfigList) end
+    })
+    s:RefreshConfigsList(ConfigList)
+
+    ConfigSection:Label({Text = "Menu Keybind", Alignment = "Left"}):Keybind({
+        Name = "Menu",
+        Flag = "menu_keybind",
+        Default = Enum.KeyCode.RightShift,
+        Mode = "Toggle",
+        Callback = function()
+            s.MenuKeybind = t.menu_keybind.Key
+        end
+    })
+    ConfigSection:Toggle({
+        Name = "Watermark",
+        Flag = "watermark",
+        Default = true,
+        Callback = function(Value) Watermark:SetVisibility(Value) end
+    })
+    ConfigSection:Toggle({
+        Name = "Keybind List",
+        Flag = "keybind_list",
+        Default = false,
+        Callback = function(Value) KeybindList:SetVisibility(Value) end
+    })
+    ConfigSection:Button({
+        Name = "Rejoin",
+        Callback = function()
+            teleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, localPlayer)
+        end
+    })
+    ConfigSection:Button({
+        Name = "Unload Library",
+        Callback = function() s:Unload() end
+    })
+end
+
+-- Runtime Logic
+local SpinAngle = 0
+local LastShot = 0
+local LastChat = 0
+local TriggerFiring = false
+
+-- Silent Aim Hook
+if Client.HasHookmetamethod and Client.HasGetnamecallmethod and Client.HasNewcclosure then
+    local oldNamecall
+    oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        local args = {...}
+
+        if method == "Raycast" and self == workspace then
+            if t["Legit/SilentAim"] and SilentAimTarget and SilentAimPart then
+                if t["Legit/SilentAim/HitChance"] >= math.random(1, 100) then
+                    args[2] = (SilentAimPart.Position - args[1]).Unit * args[2].Magnitude
+                    return oldNamecall(self, unpack(args))
+                end
+            end
+            if t["Rage/Ragebot"] and t["Rage/SilentAim"] and SilentAimTarget and SilentAimPart then
+                args[2] = (SilentAimPart.Position - args[1]).Unit * args[2].Magnitude
+                return oldNamecall(self, unpack(args))
+            end
+        end
+
+        return oldNamecall(self, ...)
+    end))
+end
+
+-- Velocity hook for anti-aim / viewmodel
+if Client.HasHookmetamethod then
+    local oldIndex
+    oldIndex = hookmetamethod(game, "__index", function(self, key)
+        if not checkcaller() then
+            if key == "Velocity" and self.Parent == localPlayer.Character and t["Rage/AntiAim"] then
+                return Vector3.zero
+            end
+        end
+        return oldIndex(self, key)
+    end)
+end
+
+runService.PreRender:Connect(function()
+    local vp = camera.ViewportSize
+
+    -- Update FOV Circles
+    LegitFovCircle.Position = Vector2.new(vp.X/2, vp.Y/2)
+    LegitFovCircle.Radius = (vp.X * ((t["Legit/Fov/Value"] / 2) / camera.FieldOfView)) / 2
+    LegitFovCircle.Visible = t["Legit/Fov/Visible"] == true
+    LegitFovCircle.Color = t["Legit/Fov/Color"] and t["Legit/Fov/Color"].Color or Color3.new(1,1,1)
+    LegitFovCircle.NumSides = t["Legit/Fov/NumSides"] or 100
+
+    RageFovCircle.Position = Vector2.new(vp.X/2, vp.Y/2)
+    RageFovCircle.Radius = (vp.X * ((t["Rage/Fov/Value"] / 2) / camera.FieldOfView)) / 2
+    RageFovCircle.Visible = t["Rage/Fov/Visible"] == true
+    RageFovCircle.Color = t["Rage/Fov/Color"] and t["Rage/Fov/Color"].Color or Color3.new(1,1,1)
+    RageFovCircle.NumSides = t["Rage/Fov/NumSides"] or 100
+
+    -- Silent Aim Target
+    if t["Legit/SilentAim"] then
+        SilentAimTarget, SilentAimPart = getTarget(t["Legit/Fov"], t["Legit/Fov/Value"], t["Legit/Hitscan"])
+    elseif t["Rage/Ragebot"] and t["Rage/SilentAim"] then
+        local hitscan = t["Rage/Hitscan"]
+        local parts = {}
+        if type(hitscan) == "table" then
+            if hitscan.Head then table.insert(parts, "Head") end
+            if hitscan.Torso then table.insert(parts, "HumanoidRootPart") end
+            if hitscan.Arms then table.insert(parts, "Left Arm"); table.insert(parts, "Right Arm") end
+            if hitscan.Legs then table.insert(parts, "Left Leg"); table.insert(parts, "Right Leg") end
+        else
+            parts = {"Head"}
+        end
+        SilentAimTarget, SilentAimPart = getTarget(t["Rage/Fov"], t["Rage/Fov/Value"], parts)
+    else
+        SilentAimTarget = nil
+        SilentAimPart = nil
+    end
+
+    -- Aim Assist
+    if t["Legit/Aimbot"] then
+        local activated = (t["Legit/Aimbot/Activate"] == "Mouse 1" and userInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)) or
+                          (t["Legit/Aimbot/Activate"] == "Mouse 2" and userInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2))
+        if activated then
+            local target, part = getTarget(t["Legit/Fov"], t["Legit/Fov/Value"], t["Legit/Hitscan"])
+            if target and part then
+                local screenPos = camera:WorldToViewportPoint(part.Position)
+                local mousePos = userInputService:GetMouseLocation()
+                local dx = screenPos.X - mousePos.X
+                local dy = screenPos.Y - mousePos.Y
+
+                if t["Legit/Aimbot/Type"] == "Mouse Movement" and Client.HasMousemoverel then
+                    local speed = t["Legit/Aimbot/Speed"] / 9
+                    mousemoverel(dx * speed / 20.5, dy * speed / 20.5)
+                elseif t["Legit/Aimbot/Type"] == "Lerp" then
+                    local targetCF = CFrame.new(camera.CFrame.Position, part.Position)
+                    local angle = math.abs(math.deg(math.acos(camera.CFrame.LookVector:Dot((part.Position - camera.CFrame.Position).Unit))))
+                    local speed = t["Legit/Aimbot/Speed"]
+                    if t["Legit/Aimbot/SpeedType"] == "Exponential" then
+                        speed = speed / 500
+                    else
+                        speed = (speed / (angle * 2 + 1)) / 100
+                    end
+                    camera.CFrame = camera.CFrame:Lerp(targetCF, math.clamp(speed, 0, 1))
+                elseif t["Legit/Aimbot/Type"] == "Stick" then
+                    camera.CFrame = CFrame.new(camera.CFrame.Position, part.Position)
+                end
+            end
+        end
+    end
+
+    -- Trigger Bot
+    if t["Legit/Triggerbot"] and t["Legit/Triggerbot/Bind"].Toggled and not TriggerFiring then
+        local rayParams = RaycastParams.new()
+        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+        rayParams.FilterDescendantsInstances = {localPlayer.Character, camera}
+        local result = workspace:Raycast(camera.CFrame.Position, camera.CFrame.LookVector * 1000, rayParams)
+        if result then
+            local hitPlayer = players:GetPlayerFromCharacter(result.Instance.Parent)
+            if hitPlayer and not isFriendly(hitPlayer) and isAlive(hitPlayer) then
+                TriggerFiring = true
+                task.spawn(function()
+                    if t["Legit/Triggerbot/Delay"] > 0 then
+                        task.wait(t["Legit/Triggerbot/Delay"] / 1000)
+                    end
+                    if mouse1press and mouse1release then
+                        mouse1press()
+                        task.wait()
+                        mouse1release()
+                    end
+                    TriggerFiring = false
+                end)
+            end
+        end
+    end
+
+    -- Rage Bot
+    if t["Rage/Ragebot"] and isAlive(localPlayer) then
+        local now = tick()
+        local fireRate = t["Rage/RapidFire"] and 0.01 or 0.1
+        if now - LastShot >= fireRate then
+            local hitscan = t["Rage/Hitscan"]
+            local parts = {}
+            if type(hitscan) == "table" then
+                if hitscan.Head then table.insert(parts, "Head") end
+                if hitscan.Torso then table.insert(parts, "HumanoidRootPart") end
+                if hitscan.Arms then table.insert(parts, "Left Arm"); table.insert(parts, "Right Arm") end
+                if hitscan.Legs then table.insert(parts, "Left Leg"); table.insert(parts, "Right Leg") end
+            else
+                parts = {"Head"}
+            end
+
+            local target, part = getTarget(t["Rage/Fov"], t["Rage/Fov/Value"], parts)
+            if target and part then
+                if not t["Rage/SilentAim"] then
+                    camera.CFrame = CFrame.new(camera.CFrame.Position, part.Position)
+                end
+                if mouse1press and mouse1release then
+                    mouse1press()
+                    task.wait()
+                    mouse1release()
+                    if t["Rage/DoubleTap"] then
+                        task.wait(0.05)
+                        mouse1press()
+                        task.wait()
+                        mouse1release()
+                    end
+                end
+                LastShot = now
+                if t["Rage/Debug"] then
+                    s:Notification("Shot at " .. target.Name, 2, Color3.fromRGB(255, 80, 80))
+                end
+            end
+        end
+    end
+
+    -- Knife Bot
+    if t["Rage/Ragebot"] and t["Rage/Knifebot"] and isAlive(localPlayer) then
+        local char = localPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            for _, player in next, players:GetPlayers() do
+                if player == localPlayer or isFriendly(player) or not isAlive(player) then continue end
+                local targetChar = player.Character
+                local targetHrp = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
+                if targetHrp then
+                    local dist = (hrp.Position - targetHrp.Position).Magnitude
+                    if dist <= t["Rage/Knifebot/Radius"] then
+                        local shouldStab = true
+                        if t["Rage/Knifebot/WallCheck"] then
+                            local rayParams = RaycastParams.new()
+                            rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+                            rayParams.FilterDescendantsInstances = {localPlayer.Character}
+                            local result = workspace:Raycast(hrp.Position, (targetHrp.Position - hrp.Position).Unit * dist, rayParams)
+                            shouldStab = result and result.Instance:IsDescendantOf(targetChar)
+                        end
+                        if shouldStab then
+                            camera.CFrame = CFrame.new(camera.CFrame.Position, targetHrp.Position)
+                            if mouse1press and mouse1release then
+                                mouse1press(); task.wait(); mouse1release()
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    -- Anti Aim
+    if t["Rage/AntiAim"] and isAlive(localPlayer) then
+        if not (t["Rage/AntiAim/Disable"] and t["Rage/AntiAim/Disable"].Toggled) then
+            local char = localPlayer.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local yaw = -math.atan2(camera.CFrame.LookVector.Z, camera.CFrame.LookVector.X) + math.rad(-90)
+                SpinAngle = SpinAngle + t["Rage/AntiAim/SpinSpeed"]
+                if SpinAngle >= 360 then SpinAngle = 0 end
+
+                if t["Rage/AntiAim/Yaw"] == "Spin" then
+                    yaw = yaw + math.rad(SpinAngle)
+                elseif t["Rage/AntiAim/Yaw"] == "Random" then
+                    yaw = yaw + math.rad(math.random(0, 360))
+                end
+                yaw = yaw + math.rad(t["Rage/AntiAim/CustomYaw"])
+
+                hrp.CFrame = CFrame.new(hrp.Position) * CFrame.Angles(0, yaw, 0)
+            end
+        end
+    end
+
+    -- Movement
+    if isAlive(localPlayer) then
+        local char = localPlayer.Character
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+
+        if hrp and humanoid then
+            -- Auto Jump
+            if t["Misc/AutoJump"] and userInputService:IsKeyDown(Enum.KeyCode.Space) and humanoid.FloorMaterial ~= Enum.Material.Air then
+                humanoid.Jump = true
+            end
+
+            -- Noclip
+            if t["Misc/Noclip"] then
+                for _, part in next, char:GetDescendants() do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+            else
+                if hrp then hrp.CanCollide = true end
+            end
+
+            -- Speed Hack
+            if t["Misc/SpeedHack"] then
+                local moveDir = Vector3.new()
+                if userInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + camera.CFrame.LookVector end
+                if userInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - camera.CFrame.LookVector end
+                if userInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - camera.CFrame.RightVector end
+                if userInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + camera.CFrame.RightVector end
+                if moveDir.Magnitude > 0 then
+                    moveDir = moveDir.Unit * (t["Misc/SpeedHack/Speed"] / 10)
+                    hrp.CFrame = hrp.CFrame + Vector3.new(moveDir.X, 0, moveDir.Z) / 100 * 2
+                end
+            end
+
+            -- Airstuck
+            if t["Misc/Airstuck"] and t["Misc/Airstuck/Bind"].Toggled then
+                hrp.Anchored = true
+            else
+                hrp.Anchored = false
+            end
+        end
+    end
+
+    -- Visuals
+    if t["Visuals/Ambient"] then
+        lighting.Ambient = t["Visuals/Ambient/AmbientColor"].Color
+        lighting.OutdoorAmbient = t["Visuals/Ambient/OutdoorAmbientColor"].Color
+    end
+
+    if t["Visuals/NoFlash"] then
+        for _, gui in next, localPlayer.PlayerGui:GetDescendants() do
+            if gui:IsA("Frame") and gui.Name:lower():find("flash") then
+                gui.Visible = false
+            end
+            if gui:IsA("ScreenGui") and gui.Name:lower():find("flash") then
+                gui.Enabled = false
+            end
+        end
+    end
+
+    if t["Visuals/NoSmoke"] then
+        for _, effect in next, workspace:GetDescendants() do
+            if effect:IsA("Smoke") or effect:IsA("Fire") then
+                effect.Enabled = false
+            end
+            if effect:IsA("ParticleEmitter") and (effect.Name:lower():find("smoke") or effect.Name:lower():find("dust")) then
+                effect.Enabled = false
+            end
+        end
+    end
+
+    if t["Visuals/TimeChanger"] then
+        lighting.ClockTime = t["Visuals/TimeChanger/Time"]
+    end
+
+    if t["Visuals/Fullbright"] then
+        lighting.Brightness = 10
+        lighting.GlobalShadows = false
+    elseif not t["Visuals/Ambient"] then
+        lighting.Brightness = 2
+        lighting.GlobalShadows = true
+    end
+
+    -- Third Person
+    if t["Visuals/ThirdPerson"] and t["Visuals/ThirdPerson/Bind"].Toggled then
+        localPlayer.CameraMode = Enum.CameraMode.Classic
+        localPlayer.CameraMaxZoomDistance = t["Visuals/ThirdPerson/Distance"]
+        localPlayer.CameraMinZoomDistance = t["Visuals/ThirdPerson/Distance"]
+    else
+        localPlayer.CameraMode = Enum.CameraMode.LockFirstPerson
+        localPlayer.CameraMaxZoomDistance = 0.5
+        localPlayer.CameraMinZoomDistance = 0.5
+    end
+
+    -- Viewmodel Offset
+    if t["Visuals/Viewmodel"] then
+        local arms = camera:FindFirstChild("Arms") or camera:FindFirstChild("Viewmodel")
+        if arms and arms:IsA("Model") then
+            for _, part in next, arms:GetDescendants() do
+                if part:IsA("BasePart") then
+                    -- This is a simplified approach; real viewmodel offset requires CFrame manipulation each frame
+                end
+            end
+        end
+    end
+
+    -- Chat Spammer
+    if t["Misc/ChatSpam"] and tick() - LastChat > 3 then
+        local msg
+        local msgType = t["Misc/ChatSpam/Type"]
+        if msgType == "Arsenal" then
+            msg = "Arsenal on top " .. tostring(math.random(1,5))
+        elseif msgType == "Advertise" then
+            msg = "Get good at Arsenal"
+        elseif msgType == "Custom" then
+            msg = t["Misc/ChatSpam/Custom"]
+        end
+        if msg then
+            local chatEvents = replicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
+            if chatEvents then
+                local sayEvent = chatEvents:FindFirstChild("SayMessageRequest")
+                if sayEvent then
+                    sayEvent:FireServer(msg, "All")
+                end
+            end
+        end
+        LastChat = tick()
+    end
+
+    -- Kill All / Priority Kill
+    if (t["Misc/KillAll"] or t["Players/Priority/Kill"]) and isAlive(localPlayer) then
+        local now = tick()
+        local hps = t["Misc/KillAll"] and t["Misc/KillAll/HPS"] or t["Players/Priority/Kill/HPS"] or 1
+        if now - LastShot >= (1 / hps) then
+            local targets = {}
+            if t["Misc/KillAll"] then
+                for _, p in next, players:GetPlayers() do
+                    if p ~= localPlayer and not isFriendly(p) and isAlive(p) then
+                        table.insert(targets, p)
+                    end
+                end
+            elseif t["Players/Priority/Kill"] then
+                for _, p in next, s.Lists.Priority or {} do
+                    if p ~= localPlayer and not isFriendly(p) and isAlive(p) then
+                        table.insert(targets, p)
+                    end
+                end
+            end
+
+            for _, target in next, targets do
+                local targetChar = target.Character
+                local head = targetChar and targetChar:FindFirstChild("Head")
+                if head and mouse1press and mouse1release then
+                    camera.CFrame = CFrame.new(camera.CFrame.Position, head.Position)
+                    mouse1press(); task.wait(); mouse1release()
+                end
+            end
+            LastShot = now
+        end
+    end
+
+    -- Gun Mods
+    if WeaponsFolder then
+        for _, weapon in next, WeaponsFolder:GetChildren() do
+            if weapon:IsA("Folder") or weapon:IsA("Configuration") then
+                local cache = WeaponCache[weapon.Name]
+                if cache then
+                    if t["Misc/GunMods/NoRecoil"] then
+                        weapon:SetAttribute("RecoilX", 0)
+                        weapon:SetAttribute("RecoilY", 0)
+                    else
+                        if cache.RecoilX ~= nil then weapon:SetAttribute("RecoilX", cache.RecoilX) end
+                        if cache.RecoilY ~= nil then weapon:SetAttribute("RecoilY", cache.RecoilY) end
+                    end
+
+                    if t["Misc/GunMods/NoSpread"] then
+                        weapon:SetAttribute("Spread", 0)
+                    else
+                        if cache.Spread ~= nil then weapon:SetAttribute("Spread", cache.Spread) end
+                    end
+
+                    if t["Misc/GunMods/FullAuto"] then
+                        weapon:SetAttribute("Auto", true)
+                    else
+                        if cache.Auto ~= nil then weapon:SetAttribute("Auto", cache.Auto) end
+                    end
+
+                    if t["Misc/GunMods/RapidFire"] then
+                        weapon:SetAttribute("FireRate", 0.01)
+                    else
+                        if cache.FireRate ~= nil then weapon:SetAttribute("FireRate", cache.FireRate) end
+                    end
+
+                    if t["Misc/GunMods/InfAmmo"] then
+                        weapon:SetAttribute("Ammo", 999)
+                        weapon:SetAttribute("StoredAmmo", 999)
+                    else
+                        if cache.Ammo ~= nil then weapon:SetAttribute("Ammo", cache.Ammo) end
+                        if cache.StoredAmmo ~= nil then weapon:SetAttribute("StoredAmmo", cache.StoredAmmo) end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- Capability Notification
+local unsupported = {}
+if not Client.HasHookmetamethod then table.insert(unsupported, "hookmetamethod") end
+if not Client.HasMousemoverel then table.insert(unsupported, "mousemoverel") end
+if not Client.HasRequire then table.insert(unsupported, "require") end
+if not Client.HasGetsenv then table.insert(unsupported, "getsenv") end
+
+if #unsupported > 0 then
+    s:Notification("Missing: " .. table.concat(unsupported, ", "), 8, Color3.fromRGB(255, 170, 0))
+end
+
+s:Notification("Arsenal Cheat Loaded", 5, Color3.fromRGB(255, 80, 80))
