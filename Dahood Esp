@@ -2,6 +2,8 @@
 local runService = game:GetService("RunService");
 local players = game:GetService("Players");
 local workspace = game:GetService("Workspace");
+local replicatedStorage = game:GetService("ReplicatedStorage");
+local lighting = game:GetService("Lighting");
 
 -- variables
 local localPlayer = players.LocalPlayer;
@@ -19,6 +21,7 @@ local cos = math.cos;
 local clear = table.clear;
 local unpack = table.unpack;
 local find = table.find;
+local clamp = math.clamp;
 
 -- methods
 local wtvp = camera.WorldToViewportPoint;
@@ -42,6 +45,8 @@ local HEALTH_TEXT_OFFSET = Vector2.new(3, -2);
 local HEALTH_BAR_OUTLINE_OFFSET = Vector2.new(0, 1);
 local NAME_OFFSET = Vector2.new(0, 2);
 local DISTANCE_OFFSET = Vector2.new(0, 2);
+local WEAPON_OFFSET = Vector2.new(0, 2);
+local AMMO_OFFSET = Vector2.new(0, 2);
 local VERTICES = {
 	Vector3.new(-1, -1, -1),
 	Vector3.new(-1, 1, -1),
@@ -51,6 +56,28 @@ local VERTICES = {
 	Vector3.new(1, 1, -1),
 	Vector3.new(1, 1, 1),
 	Vector3.new(1, -1, 1)
+};
+
+-- dahood weapon ammo database (fallback values)
+local WEAPON_AMMO_DB = {
+	["TacticalShotgun"] = {mag = 6, reserve = 24},
+	["Tactical Shotgun"] = {mag = 6, reserve = 24},
+	["DoubleBarrel"] = {mag = 2, reserve = 18},
+	["Double Barrel"] = {mag = 2, reserve = 18},
+	["Revolver"] = {mag = 6, reserve = 24},
+	["SMG"] = {mag = 30, reserve = 90},
+	["LMG"] = {mag = 100, reserve = 200},
+	["RPG"] = {mag = 1, reserve = 5},
+	["Flamethrower"] = {mag = 100, reserve = 300},
+	["Grenade"] = {mag = 1, reserve = 3},
+	["Molotov"] = {mag = 1, reserve = 3},
+	["Fists"] = {mag = 0, reserve = 0},
+	["Lockpick"] = {mag = 0, reserve = 0},
+	["Bat"] = {mag = 0, reserve = 0},
+	["Shovel"] = {mag = 0, reserve = 0},
+	["Knife"] = {mag = 0, reserve = 0},
+	["PepperSpray"] = {mag = 0, reserve = 0},
+	["Pepper Spray"] = {mag = 0, reserve = 0},
 };
 
 -- functions
@@ -98,6 +125,95 @@ end
 local function rotateVector(vector, radians)
 	local c, s = cos(radians), sin(radians);
 	return Vector2.new(c*vector.X - s*vector.Y, s*vector.X + c*vector.Y);
+end
+
+-- ============================================================
+-- DA HOOD UTILITY FUNCTIONS
+-- ============================================================
+
+local function getToolAmmo(tool)
+	if not tool then return nil, nil end
+
+	local mag, reserve = nil, nil
+
+	-- Check for common ammo value names
+	local ammoVal = tool:FindFirstChild("Ammo") or tool:FindFirstChild("ammo") or tool:FindFirstChild("CurrentAmmo")
+	local maxAmmoVal = tool:FindFirstChild("MaxAmmo") or tool:FindFirstChild("maxAmmo") or tool:FindFirstChild("MaxAmmo")
+	local storedVal = tool:FindFirstChild("StoredAmmo") or tool:FindFirstChild("stored") or tool:FindFirstChild("Reserve")
+
+	if ammoVal and ammoVal:IsA("NumberValue") then
+		mag = ammoVal.Value
+	elseif ammoVal and ammoVal:IsA("IntValue") then
+		mag = ammoVal.Value
+	end
+
+	if storedVal and storedVal:IsA("NumberValue") then
+		reserve = storedVal.Value
+	elseif storedVal and storedVal:IsA("IntValue") then
+		reserve = storedVal.Value
+	end
+
+	-- If no stored ammo but max ammo exists, estimate reserve
+	if not reserve and maxAmmoVal then
+		local maxAmmo = maxAmmoVal:IsA("NumberValue") and maxAmmoVal.Value or (maxAmmoVal:IsA("IntValue") and maxAmmoVal.Value or nil)
+		if maxAmmo and mag then
+			reserve = maxAmmo * 3 -- common Da Hood reserve multiplier
+		end
+	end
+
+	return mag, reserve
+end
+
+local function getPlayerStatus(character)
+	if not character then return "normal" end
+
+	-- Check for tasered/electric effect (white body)
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		-- Check if humanoid has electric status
+		if humanoid:GetAttribute("Tased") or humanoid:GetAttribute("Stunned") then
+			return "tasered"
+		end
+		if humanoid:GetAttribute("Knocked") or humanoid:GetAttribute("KO") then
+			return "knocked"
+		end
+		if humanoid.WalkSpeed and humanoid.WalkSpeed < 4 then
+			return "slowed"
+		end
+	end
+
+	-- Check for body effects that indicate electric status
+	local bodyEffects = character:FindFirstChild("BodyEffects")
+	if bodyEffects then
+		local defense = bodyEffects:FindFirstChild("Defense")
+		if defense and defense.Value == true then
+			return "defense"
+		end
+		local armor = bodyEffects:FindFirstChild("Armor")
+		if armor and armor.Value > 0 then
+			return "armored"
+		end
+	end
+
+	-- Check for grab/knocked
+	local KO = character:FindFirstChild("KO")
+	if KO and (KO.Value == true or KO:GetAttribute("Value") == true) then
+		return "knocked"
+	end
+
+	return "normal"
+end
+
+local function getArmorValue(character)
+	if not character then return 0 end
+	local bodyEffects = character:FindFirstChild("BodyEffects")
+	if bodyEffects then
+		local armor = bodyEffects:FindFirstChild("Armor")
+		if armor then
+			return armor:IsA("NumberValue") and armor.Value or (armor:IsA("IntValue") and armor.Value or 0)
+		end
+	end
+	return 0
 end
 
 -- esp object
@@ -151,6 +267,11 @@ function EspObject:Construct()
 			name = self:create("Text", { Text = self.player.Name, Center = true, Visible = false }),
 			distance = self:create("Text", { Center = true, Visible = false }),
 			weapon = self:create("Text", { Center = true, Visible = false }),
+			ammo = self:create("Text", { Center = true, Visible = false }),
+			armorBar = self:create("Line", { Thickness = 1, Visible = false }),
+			armorBarOutline = self:create("Line", { Thickness = 3, Visible = false }),
+			armorText = self:create("Text", { Center = true, Visible = false }),
+			status = self:create("Text", { Center = true, Visible = false }),
 		}
 	};
 
@@ -185,7 +306,9 @@ function EspObject:Update()
 	self.options = interface.teamSettings[interface.isFriendly(self.player) and "friendly" or "enemy"];
 	self.character, self.alive = interface.getCharacter(self.player);
 	self.health, self.maxHealth = interface.getHealth(self.player);
-	self.weapon = interface.getWeapon(self.player);
+	self.weapon, self.magAmmo, self.reserveAmmo = interface.getWeapon(self.player);
+	self.armor = interface.getArmor(self.player);
+	self.status = interface.getStatus(self.player);
 	self.enabled = self.options.enabled and self.character and self.alive and not
 		(#interface.whitelist > 0 and not find(interface.whitelist, self.player.UserId));
 	self.isPriority = (interface.sharedSettings.showPriorities and find(interface.priorities, self.player.UserId)) and true or false
@@ -239,6 +362,7 @@ function EspObject:Render()
 	local options = self.options;
 	local corners = self.corners;
 
+	-- Box
 	visible.box.Visible = enabled and onScreen and options.box;
 	visible.boxOutline.Visible = visible.box.Visible and options.boxOutline;
 	if visible.box.Visible then
@@ -255,6 +379,7 @@ function EspObject:Render()
 		boxOutline.Transparency = options.boxOutlineColor[2];
 	end
 
+	-- Box Fill
 	visible.boxFill.Visible = enabled and onScreen and options.boxFill;
 	if visible.boxFill.Visible then
 		local boxFill = visible.boxFill;
@@ -264,6 +389,7 @@ function EspObject:Render()
 		boxFill.Transparency = options.boxFillColor[2];
 	end
 
+	-- Health Bar
 	visible.healthBar.Visible = enabled and onScreen and options.healthBar;
 	visible.healthBarOutline.Visible = visible.healthBar.Visible and options.healthBarOutline;
 	if visible.healthBar.Visible then
@@ -273,7 +399,7 @@ function EspObject:Render()
 		local healthBar = visible.healthBar;
 		healthBar.To = barTo;
 		healthBar.From = lerp2(barTo, barFrom, self.health/self.maxHealth);
-		healthBar.Color = lerpColor(options.healthyColor, options.dyingColor, self.health/self.maxHealth);
+		healthBar.Color = lerpColor(options.dyingColor, options.healthyColor, self.health/self.maxHealth);
 
 		local healthBarOutline = visible.healthBarOutline;
 		healthBarOutline.To = barTo + HEALTH_BAR_OUTLINE_OFFSET;
@@ -282,6 +408,7 @@ function EspObject:Render()
 		healthBarOutline.Transparency = options.healthBarOutlineColor[2];
 	end
 
+	-- Health Text
 	visible.healthText.Visible = enabled and onScreen and options.healthText;
 	if visible.healthText.Visible then
 		local barFrom = corners.topLeft - HEALTH_BAR_OFFSET;
@@ -298,6 +425,45 @@ function EspObject:Render()
 		healthText.Position = lerp2(barTo, barFrom, self.health/self.maxHealth) - healthText.TextBounds*0.5 - HEALTH_TEXT_OFFSET;
 	end
 
+	-- Armor Bar (Da Hood specific)
+	visible.armorBar.Visible = enabled and onScreen and options.armorBar and self.armor > 0;
+	visible.armorBarOutline.Visible = visible.armorBar.Visible and options.armorBarOutline;
+	if visible.armorBar.Visible then
+		local armorOffset = HEALTH_BAR_OFFSET + Vector2.new(-8, 0)
+		local barFrom = corners.topLeft - armorOffset;
+		local barTo = corners.bottomLeft - armorOffset;
+
+		local armorBar = visible.armorBar;
+		armorBar.To = barTo;
+		armorBar.From = lerp2(barTo, barFrom, self.armor/100);
+		armorBar.Color = options.armorColor;
+
+		local armorBarOutline = visible.armorBarOutline;
+		armorBarOutline.To = barTo + HEALTH_BAR_OUTLINE_OFFSET;
+		armorBarOutline.From = barFrom - HEALTH_BAR_OUTLINE_OFFSET;
+		armorBarOutline.Color = options.armorOutlineColor[1];
+		armorBarOutline.Transparency = options.armorOutlineColor[2];
+	end
+
+	-- Armor Text
+	visible.armorText.Visible = enabled and onScreen and options.armorText and self.armor > 0;
+	if visible.armorText.Visible then
+		local armorOffset = HEALTH_BAR_OFFSET + Vector2.new(-8, 0)
+		local barFrom = corners.topLeft - armorOffset;
+		local barTo = corners.bottomLeft - armorOffset;
+
+		local armorText = visible.armorText;
+		armorText.Text = tostring(round(self.armor));
+		armorText.Size = interface.sharedSettings.textSize;
+		armorText.Font = interface.sharedSettings.textFont;
+		armorText.Color = options.armorTextColor[1];
+		armorText.Transparency = options.armorTextColor[2];
+		armorText.Outline = options.armorTextOutline;
+		armorText.OutlineColor = options.armorTextOutlineColor;
+		armorText.Position = lerp2(barTo, barFrom, self.armor/100) - armorText.TextBounds*0.5 - HEALTH_TEXT_OFFSET;
+	end
+
+	-- Name
 	visible.name.Visible = enabled and onScreen and options.name;
 	if visible.name.Visible then
 		local name = visible.name;
@@ -310,6 +476,7 @@ function EspObject:Render()
 		name.Position = (corners.topLeft + corners.topRight)*0.5 - Vector2.yAxis*name.TextBounds.Y - NAME_OFFSET;
 	end
 
+	-- Distance
 	visible.distance.Visible = enabled and onScreen and self.distance and options.distance;
 	if visible.distance.Visible then
 		local distance = visible.distance;
@@ -323,10 +490,11 @@ function EspObject:Render()
 		distance.Position = (corners.bottomLeft + corners.bottomRight)*0.5 + DISTANCE_OFFSET;
 	end
 
+	-- Weapon
 	visible.weapon.Visible = enabled and onScreen and options.weapon;
 	if visible.weapon.Visible then
 		local weapon = visible.weapon;
-		weapon.Text = self.weapon;
+		weapon.Text = tostring(self.weapon):upper();
 		weapon.Size = interface.sharedSettings.textSize;
 		weapon.Font = interface.sharedSettings.textFont;
 		weapon.Color = (interface.sharedSettings.showPriorities and self.isPriority) and interface.sharedSettings.prioritiesColor or options.weaponColor[1];
@@ -338,6 +506,46 @@ function EspObject:Render()
 			(visible.distance.Visible and DISTANCE_OFFSET + Vector2.yAxis*visible.distance.TextBounds.Y or Vector2.zero);
 	end
 
+	-- Ammo (Da Hood specific)
+	visible.ammo.Visible = enabled and onScreen and options.ammo and self.magAmmo ~= nil;
+	if visible.ammo.Visible then
+		local ammo = visible.ammo;
+		local ammoText = self.magAmmo .. "/" .. (self.reserveAmmo or "?")
+		ammo.Text = "[[" .. tostring(self.weapon):upper() .. "]]\n" .. ammoText;
+		ammo.Size = interface.sharedSettings.textSize;
+		ammo.Font = interface.sharedSettings.textFont;
+		ammo.Color = options.ammoColor[1];
+		ammo.Transparency = options.ammoColor[2];
+		ammo.Outline = options.ammoOutline;
+		ammo.OutlineColor = options.ammoOutlineColor;
+
+		-- Position below weapon text
+		local basePos = (corners.bottomLeft + corners.bottomRight)*0.5
+		local offset = Vector2.zero
+		if visible.distance.Visible then
+			offset = offset + DISTANCE_OFFSET + Vector2.yAxis*visible.distance.TextBounds.Y
+		end
+		if visible.weapon.Visible then
+			offset = offset + WEAPON_OFFSET + Vector2.yAxis*visible.weapon.TextBounds.Y
+		end
+		ammo.Position = basePos + offset
+	end
+
+	-- Status (Da Hood specific - shows Tased/Knocked/etc)
+	visible.status.Visible = enabled and onScreen and options.status and self.status ~= "normal";
+	if visible.status.Visible then
+		local status = visible.status;
+		status.Text = "[" .. self.status:upper() .. "]";
+		status.Size = interface.sharedSettings.textSize;
+		status.Font = interface.sharedSettings.textFont;
+		status.Color = options.statusColors[self.status] or options.statusColor[1];
+		status.Transparency = options.statusColor[2];
+		status.Outline = options.statusOutline;
+		status.OutlineColor = options.statusOutlineColor;
+		status.Position = (corners.topLeft + corners.topRight)*0.5 - Vector2.yAxis*(visible.name.TextBounds.Y + NAME_OFFSET.Y + status.TextBounds.Y + 2);
+	end
+
+	-- Tracer
 	visible.tracer.Visible = enabled and onScreen and options.tracer;
 	visible.tracerOutline.Visible = visible.tracer.Visible and options.tracerOutline;
 	if visible.tracer.Visible then
@@ -357,6 +565,7 @@ function EspObject:Render()
 		tracerOutline.From = tracer.From;
 	end
 
+	-- 3D Box
 	local box3dEnabled = enabled and onScreen and options.box3d;
 	for i = 1, #box3d do
 		local face = box3d[i];
@@ -383,7 +592,10 @@ function EspObject:Render()
 	end
 end
 
--- cham object
+-- ============================================================
+-- ENHANCED CHAMS OBJECT (Da Hood Style)
+-- ============================================================
+
 local ChamObject = {};
 ChamObject.__index = ChamObject;
 
@@ -398,19 +610,26 @@ end
 function ChamObject:Construct()
 	self.chamsFolder = Instance.new("Folder", container)
 	self.chamsFolder.Name = self.player.Name .. "_Chams"
-	
+
 	self.fillsFolder = Instance.new("Folder", self.chamsFolder)
 	self.fillsFolder.Name = "fills"
-	
+
 	self.outlinesFolder = Instance.new("Folder", self.chamsFolder)
 	self.outlinesFolder.Name = "outlines"
-	
+
+	self.effectsFolder = Instance.new("Folder", self.chamsFolder)
+	self.effectsFolder.Name = "effects"
+
 	self.rigs = {
 		[0] = {"Head", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg"},
-		[1] = {"Head", "UpperTorso", "LeftUpperArm", "RightUpperArm", "LeftUpperLeg", "RightUpperLeg"}
+		[1] = {"Head", "UpperTorso", "LowerTorso", "LeftUpperArm", "LeftLowerArm", "LeftHand", "RightUpperArm", "RightLowerArm", "RightHand", "LeftUpperLeg", "LeftLowerLeg", "LeftFoot", "RightUpperLeg", "RightLowerLeg", "RightFoot"}
 	}
-	
+
 	self.highlights = {}
+	self.effectParticles = {}
+	self.initialized = false
+	self.lastWeapon = nil
+
 	self.updateConnection = runService.Heartbeat:Connect(function()
 		self:Update();
 	end);
@@ -419,13 +638,15 @@ end
 function ChamObject:getRigType()
 	if self.player.Character then
 		local humanoid = self.player.Character:FindFirstChildOfClass("Humanoid")
-		return humanoid and humanoid.RigType.Value or 0
+		if humanoid then
+			return humanoid.RigType == Enum.HumanoidRigType.R15 and 1 or 0
+		end
 	end
 	return 0
 end
 
 function ChamObject:loadLimb(limbName)
-	if self.player.Character and self.player.Character:FindFirstChild(limbName) then
+	if self.player.Character then
 		return self.player.Character:FindFirstChild(limbName)
 	end
 	return nil
@@ -433,35 +654,68 @@ end
 
 function ChamObject:makeChams()
 	local rigtype = self:getRigType()
-	
+
 	for _, limb in ipairs(self.rigs[rigtype]) do
 		local part = self:loadLimb(limb)
-		if part then
+		if part and part:IsA("BasePart") then
+			-- Fill (inner color)
 			local fillHighlight = Instance.new("BoxHandleAdornment", self.fillsFolder)
-			fillHighlight.Name = limb
-			fillHighlight.Size = part.Size + Vector3.new(0.01, 0.01, 0.01)
+			fillHighlight.Name = limb .. "_Fill"
+			fillHighlight.Size = part.Size + Vector3.new(0.02, 0.02, 0.02)
 			fillHighlight.Adornee = part
-			fillHighlight.Color3 = self.player.TeamColor.Color
 			fillHighlight.Transparency = 0
 			fillHighlight.AlwaysOnTop = true
 			fillHighlight.ZIndex = 2
-			
+
+			-- Outline (outer glow)
 			local outlineHighlight = Instance.new("BoxHandleAdornment", self.outlinesFolder)
-			outlineHighlight.Name = limb
-			outlineHighlight.Size = part.Size + Vector3.new(0.2, 0.2, 0.2)
+			outlineHighlight.Name = limb .. "_Outline"
+			outlineHighlight.Size = part.Size + Vector3.new(0.15, 0.15, 0.15)
 			outlineHighlight.Adornee = part
-			outlineHighlight.Transparency = 0
-			outlineHighlight.Color3 = Color3.new(
-				math.min(self.player.TeamColor.Color.r + 0.8, 1),
-				math.min(self.player.TeamColor.Color.g + 0.8, 1),
-				math.min(self.player.TeamColor.Color.b + 0.8, 1)
-			)
+			outlineHighlight.Transparency = 0.1
 			outlineHighlight.AlwaysOnTop = false
 			outlineHighlight.ZIndex = 1
-			
-			self.highlights[limb] = {fill = fillHighlight, outline = outlineHighlight}
+
+			self.highlights[limb] = {fill = fillHighlight, outline = outlineHighlight, part = part}
 		end
 	end
+end
+
+function ChamObject:makeElectricEffect()
+	-- Create electric spark particles for tasered effect
+	local rigtype = self:getRigType()
+	for _, limb in ipairs(self.rigs[rigtype]) do
+		local part = self:loadLimb(limb)
+		if part and part:IsA("BasePart") then
+			local attachment = Instance.new("Attachment", part)
+			attachment.Name = "ElectricAttachment"
+
+			local spark = Instance.new("ParticleEmitter", attachment)
+			spark.Name = "ElectricSpark"
+			spark.Texture = "rbxassetid://258128463" -- electric spark texture
+			spark.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.new(0.8, 0.9, 1))
+			spark.Size = NumberSequence.new(0.5, 0.1)
+			spark.Transparency = NumberSequence.new(0, 1)
+			spark.Lifetime = NumberRange.new(0.1, 0.3)
+			spark.Rate = 50
+			spark.Speed = NumberRange.new(2, 5)
+			spark.SpreadAngle = Vector2.new(180, 180)
+			spark.Acceleration = Vector3.new(0, 5, 0)
+			spark.LightEmission = 1
+			spark.LightInfluence = 0
+
+			self.effectParticles[limb] = {attachment = attachment, spark = spark}
+		end
+	end
+end
+
+function ChamObject:clearEffects()
+	for limb, effect in pairs(self.effectParticles) do
+		if effect.attachment then
+			effect.attachment:Destroy()
+		end
+	end
+	self.effectParticles = {}
 end
 
 function ChamObject:Update()
@@ -471,36 +725,90 @@ function ChamObject:Update()
 	local enabled = options.enabled and options.chams and character and alive and not
 		(#interface.whitelist > 0 and not find(interface.whitelist, self.player.UserId))
 	local isPriority = (interface.sharedSettings.showPriorities and find(interface.priorities, self.player.UserId)) and true or false
-	
+	local status = interface.getStatus(self.player)
+	local weapon = interface.getWeapon(self.player)
+
+	-- Initialize chams if needed
 	if enabled and not self.initialized then
 		self:makeChams()
 		self.initialized = true
 	end
-	
+
+	-- Handle effects based on status
+	if enabled and status == "tasered" and not self.hasElectricEffect then
+		self:makeElectricEffect()
+		self.hasElectricEffect = true
+	elseif (not enabled or status ~= "tasered") and self.hasElectricEffect then
+		self:clearEffects()
+		self.hasElectricEffect = false
+	end
+
 	if self.initialized then
 		local isEnemy = not interface.isFriendly(self.player)
-		
+
+		-- Determine colors based on status and settings
+		local fillColor, outlineColor, fillTrans, outlineTrans
+
+		if status == "tasered" then
+			-- White/transparent electric style (image 2)
+			fillColor = Color3.new(1, 1, 1)
+			outlineColor = Color3.new(0.9, 0.95, 1)
+			fillTrans = 0.7
+			outlineTrans = 0.3
+		elseif status == "knocked" then
+			-- Darker/red when knocked
+			fillColor = Color3.new(0.3, 0, 0)
+			outlineColor = Color3.new(0.5, 0, 0)
+			fillTrans = 0.5
+			outlineTrans = 0.2
+		else
+			-- Normal enemy chams (image 1 style - red fill, pink outline)
+			if isEnemy then
+				fillColor = (interface.sharedSettings.showPriorities and isPriority) and interface.sharedSettings.prioritiesColor or options.chamsFillColor[1]
+				outlineColor = options.chamsOutlineColor[1]
+				fillTrans = options.chamsFillColor[2]
+				outlineTrans = options.chamsOutlineColor[2]
+			else
+				fillColor = options.chamsFillColor[1]
+				outlineColor = options.chamsOutlineColor[1]
+				fillTrans = options.chamsFillColor[2]
+				outlineTrans = options.chamsOutlineColor[2]
+			end
+		end
+
 		for limb, highlights in pairs(self.highlights) do
 			local part = self:loadLimb(limb)
-			
+
 			if enabled and isEnemy and part then
+				-- Update adornments
 				highlights.fill.Adornee = part
-				highlights.fill.Color3 = (interface.sharedSettings.showPriorities and isPriority) and interface.sharedSettings.prioritiesColor or options.chamsFillColor[1]
-				highlights.fill.Transparency = options.chamsFillColor[2]
-				
+				highlights.fill.Color3 = fillColor
+				highlights.fill.Transparency = fillTrans
+
 				highlights.outline.Adornee = part
-				highlights.outline.Color3 = options.chamsOutlineColor[1]
-				highlights.outline.Transparency = options.chamsOutlineColor[2]
+				highlights.outline.Color3 = outlineColor
+				highlights.outline.Transparency = outlineTrans
+
+				-- Update size in case character changed
+				highlights.fill.Size = part.Size + Vector3.new(0.02, 0.02, 0.02)
+				highlights.outline.Size = part.Size + Vector3.new(0.15, 0.15, 0.15)
 			else
 				highlights.fill.Adornee = nil
 				highlights.outline.Adornee = nil
 			end
+		end
+
+		-- Update weapon tag billboard if enabled
+		if options.chamsWeaponTag and weapon ~= self.lastWeapon then
+			self.lastWeapon = weapon
+			-- Could add billboard gui here for weapon name above head
 		end
 	end
 end
 
 function ChamObject:Destruct()
 	self.updateConnection:Disconnect()
+	self:clearEffects()
 	if self.chamsFolder then
 		self.chamsFolder:Destroy()
 	end
@@ -595,39 +903,50 @@ local EspInterface = {
 	},
 	teamSettings = {
 		enemy = {
-			enabled = false,
-			box = false,
-			boxColor = { Color3.new(1,0,0), 1 },
+			enabled = true,
+			box = true,
+			boxColor = { Color3.fromRGB(255, 50, 50), 1 },
 			boxOutline = true,
 			boxOutlineColor = { Color3.new(), 1 },
 			boxFill = false,
-			boxFillColor = { Color3.new(1,0,0), 0.5 },
-			healthBar = false,
-			healthyColor = Color3.new(0,1,0),
-			dyingColor = Color3.new(1,0,0),
+			boxFillColor = { Color3.fromRGB(255, 0, 0), 0.3 },
+			healthBar = true,
+			healthyColor = Color3.fromRGB(0, 255, 100),
+			dyingColor = Color3.fromRGB(255, 0, 0),
 			healthBarOutline = true,
 			healthBarOutlineColor = { Color3.new(), 0.5 },
-			healthText = false,
+			healthText = true,
 			healthTextColor = { Color3.new(1,1,1), 1 },
 			healthTextOutline = true,
 			healthTextOutlineColor = Color3.new(),
+			armorBar = true,
+			armorColor = Color3.fromRGB(0, 150, 255),
+			armorOutlineColor = { Color3.new(), 0.5 },
+			armorText = false,
+			armorTextColor = { Color3.fromRGB(0, 150, 255), 1 },
+			armorTextOutline = true,
+			armorTextOutlineColor = Color3.new(),
 			box3d = false,
-			box3dColor = { Color3.new(1,0,0), 1 },
-			name = false,
+			box3dColor = { Color3.fromRGB(255, 50, 50), 1 },
+			name = true,
 			nameColor = { Color3.new(1,1,1), 1 },
 			nameOutline = true,
 			nameOutlineColor = Color3.new(),
-			weapon = false,
-			weaponColor = { Color3.new(1,1,1), 1 },
+			weapon = true,
+			weaponColor = { Color3.fromRGB(255, 200, 50), 1 },
 			weaponOutline = true,
 			weaponOutlineColor = Color3.new(),
+			ammo = true,
+			ammoColor = { Color3.new(1,1,1), 1 },
+			ammoOutline = true,
+			ammoOutlineColor = Color3.new(),
 			distance = false,
 			distanceColor = { Color3.new(1,1,1), 1 },
 			distanceOutline = true,
 			distanceOutlineColor = Color3.new(),
 			tracer = false,
 			tracerOrigin = "Bottom",
-			tracerColor = { Color3.new(1,0,0), 1 },
+			tracerColor = { Color3.fromRGB(255, 50, 50), 1 },
 			tracerOutline = true,
 			tracerOutlineColor = { Color3.new(), 1 },
 			offScreenArrow = false,
@@ -636,10 +955,22 @@ local EspInterface = {
 			offScreenArrowRadius = 150,
 			offScreenArrowOutline = true,
 			offScreenArrowOutlineColor = { Color3.new(), 1 },
-			chams = false,
+			chams = true,
 			chamsVisibleOnly = false,
-			chamsFillColor = { Color3.new(1,0,0), 0.5 },
-			chamsOutlineColor = { Color3.new(1,1,1), 0 },
+			chamsFillColor = { Color3.fromRGB(180, 30, 30), 0.4 },
+			chamsOutlineColor = { Color3.fromRGB(255, 100, 150), 0.1 },
+			chamsWeaponTag = true,
+			status = true,
+			statusColor = { Color3.new(1,1,1), 1 },
+			statusOutline = true,
+			statusOutlineColor = Color3.new(),
+			statusColors = {
+				tasered = Color3.fromRGB(100, 200, 255),
+				knocked = Color3.fromRGB(255, 50, 50),
+				slowed = Color3.fromRGB(255, 200, 50),
+				defense = Color3.fromRGB(0, 255, 100),
+				armored = Color3.fromRGB(0, 150, 255),
+			},
 		},
 		friendly = {
 			enabled = false,
@@ -658,6 +989,13 @@ local EspInterface = {
 			healthTextColor = { Color3.new(1,1,1), 1 },
 			healthTextOutline = true,
 			healthTextOutlineColor = Color3.new(),
+			armorBar = false,
+			armorColor = Color3.fromRGB(0, 150, 255),
+			armorOutlineColor = { Color3.new(), 0.5 },
+			armorText = false,
+			armorTextColor = { Color3.fromRGB(0, 150, 255), 1 },
+			armorTextOutline = true,
+			armorTextOutlineColor = Color3.new(),
 			box3d = false,
 			box3dColor = { Color3.new(0,1,0), 1 },
 			name = false,
@@ -668,6 +1006,10 @@ local EspInterface = {
 			weaponColor = { Color3.new(1,1,1), 1 },
 			weaponOutline = true,
 			weaponOutlineColor = Color3.new(),
+			ammo = false,
+			ammoColor = { Color3.new(1,1,1), 1 },
+			ammoOutline = true,
+			ammoOutlineColor = Color3.new(),
 			distance = false,
 			distanceColor = { Color3.new(1,1,1), 1 },
 			distanceOutline = true,
@@ -687,6 +1029,18 @@ local EspInterface = {
 			chamsVisibleOnly = false,
 			chamsFillColor = { Color3.new(0,1,0), 0.5 },
 			chamsOutlineColor = { Color3.new(1,1,1), 0 },
+			chamsWeaponTag = false,
+			status = false,
+			statusColor = { Color3.new(1,1,1), 1 },
+			statusOutline = true,
+			statusOutlineColor = Color3.new(),
+			statusColors = {
+				tasered = Color3.fromRGB(100, 200, 255),
+				knocked = Color3.fromRGB(255, 50, 50),
+				slowed = Color3.fromRGB(255, 200, 50),
+				defense = Color3.fromRGB(0, 255, 100),
+				armored = Color3.fromRGB(0, 150, 255),
+			},
 		}
 	}
 };
@@ -748,24 +1102,36 @@ function EspInterface.Unload()
 end
 
 -- ============================================================
--- DA HOOD SPECIFIC FUNCTIONS
+-- DA HOOD SPECIFIC FUNCTIONS (ENHANCED)
 -- ============================================================
 
 function EspInterface.getWeapon(player)
 	local character = player.Character
-	if not character then return "Fists" end
+	if not character then return "Fists", nil, nil end
 
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
-	if not humanoid or humanoid.Health <= 0 then return "Fists" end
+	if not humanoid or humanoid.Health <= 0 then return "Fists", nil, nil end
 
 	-- Da Hood stores weapons as Tools in the character
 	for _, child in ipairs(character:GetChildren()) do
 		if child:IsA("Tool") then
-			return child.Name
+			local mag, reserve = getToolAmmo(child)
+			local weaponName = child.Name
+
+			-- Fallback to database if no ammo values found
+			if not mag then
+				local dbEntry = WEAPON_AMMO_DB[weaponName] or WEAPON_AMMO_DB[weaponName:gsub(" ", "")]
+				if dbEntry then
+					mag = dbEntry.mag
+					reserve = dbEntry.reserve
+				end
+			end
+
+			return weaponName, mag, reserve
 		end
 	end
 
-	return "Fists"
+	return "Fists", nil, nil
 end
 
 function EspInterface.isFriendly(player)
@@ -800,6 +1166,14 @@ function EspInterface.getHealth(player)
 	end
 
 	return 100, 100
+end
+
+function EspInterface.getArmor(player)
+	return getArmorValue(player.Character)
+end
+
+function EspInterface.getStatus(player)
+	return getPlayerStatus(player.Character)
 end
 
 return EspInterface;
