@@ -199,8 +199,8 @@ end r.Game.EquippedWeapon=o.Character:GetAttribute'WhatGun'r.Game.EquippedWeapon
 end)
 end f:SetOutgoingKBPSLimit(0)o.PlayerScripts.ImAFKBruh.Disabled=true o.PlayerScripts.ImAFKBruh:GetPropertyChangedSignal'Disabled':Connect(function()o.PlayerScripts.ImAFKBruh.Disabled=true 
 end)
-local s=loadstring(game:HttpGet'https://i.e-z.host/p/raw/cfc14zc152')()
-local t,u,v,w,x=s.Flags,loadstring(game:HttpGet'https://i.e-z.host/p/raw/8ll5apkgoz')(),s:Window{
+local s=loadstring(game:HttpGet'https://raw.githubusercontent.com/cabscer/neyrone-open-sourced/refs/heads/main/Library')()
+local t,u,v,w,x=s.Flags,loadstring(game:HttpGet'https://raw.githubusercontent.com/cabscer/neyrone-open-sourced/refs/heads/main/Defusal%20Esp')(),s:Window{
     Name='N E Y R O N E',Size=UDim2.new(0,593,0,800),GradientTitle={
         Enabled=true,Start=Color3.fromRGB(255,255,255),Middle=Color3.fromRGB(149,255,139),End=Color3.fromRGB(149,255,139),Speed=1
     }
